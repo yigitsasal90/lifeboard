@@ -6,7 +6,6 @@
 <div class="card-grid">
     <div class="card">
         <h3>Routine</h3>
-
         {% if latest_routine %}
             <p><strong>Enerji:</strong> {{ latest_routine['energy'] }}</p>
             <p><strong>Aktivite:</strong> {{ latest_routine['activity'] }}</p>
@@ -18,7 +17,6 @@
 
     <div class="card">
         <h3>Boo</h3>
-
         {% if latest_boo %}
             <p><strong>İştah:</strong> {{ latest_boo['appetite'] }}</p>
             <p><strong>Enerji:</strong> {{ latest_boo['energy'] }}</p>
@@ -39,27 +37,27 @@
         <h3>Routine Kaydı Ekle</h3>
 
         <form action="/add-routine" method="POST" class="module-form">
-            <label>Tarih</label>
-            <input type="date" name="date" required>
+            <label for="date">Tarih</label>
+            <input id="date" type="date" name="date" required>
 
-            <label>Enerji</label>
-            <select name="energy" required>
+            <label for="energy">Enerji</label>
+            <select id="energy" name="energy" required>
                 <option value="">Seç</option>
                 <option value="Düşük">Düşük</option>
                 <option value="Orta">Orta</option>
                 <option value="Yüksek">Yüksek</option>
             </select>
 
-            <label>Kas Ağrısı</label>
-            <select name="soreness" required>
+            <label for="soreness">Kas Ağrısı</label>
+            <select id="soreness" name="soreness" required>
                 <option value="">Seç</option>
                 <option value="Yok">Yok</option>
                 <option value="Hafif">Hafif</option>
                 <option value="Belirgin">Belirgin</option>
             </select>
 
-            <label>Aktivite</label>
-            <select name="activity" required>
+            <label for="activity">Aktivite</label>
+            <select id="activity" name="activity" required>
                 <option value="">Seç</option>
                 <option value="Dinlenme">Dinlenme</option>
                 <option value="Yürüyüş">Yürüyüş</option>
@@ -69,8 +67,8 @@
                 <option value="Padel">Padel</option>
             </select>
 
-            <label>Not</label>
-            <textarea name="notes" rows="4" placeholder="Bugün nasıl hissettin?"></textarea>
+            <label for="notes">Not</label>
+            <textarea id="notes" name="notes" rows="4" placeholder="Bugün nasıl hissettin?"></textarea>
 
             <button type="submit">Routine Kaydet</button>
         </form>
@@ -105,27 +103,27 @@
         <h3>Boo Kaydı Ekle</h3>
 
         <form action="/add-boo" method="POST" class="module-form">
-            <label>Tarih</label>
-            <input type="date" name="boo_date" required>
+            <label for="boo_date">Tarih</label>
+            <input id="boo_date" type="date" name="boo_date" required>
 
-            <label>İştah</label>
-            <select name="boo_appetite" required>
+            <label for="boo_appetite">İştah</label>
+            <select id="boo_appetite" name="boo_appetite" required>
                 <option value="">Seç</option>
                 <option value="İyi">İyi</option>
                 <option value="Orta">Orta</option>
                 <option value="Düşük">Düşük</option>
             </select>
 
-            <label>Enerji</label>
-            <select name="boo_energy" required>
+            <label for="boo_energy">Enerji</label>
+            <select id="boo_energy" name="boo_energy" required>
                 <option value="">Seç</option>
                 <option value="Normal">Normal</option>
                 <option value="Düşük">Düşük</option>
                 <option value="Çok Hareketli">Çok Hareketli</option>
             </select>
 
-            <label>Tuvalet</label>
-            <select name="boo_toilet" required>
+            <label for="boo_toilet">Tuvalet</label>
+            <select id="boo_toilet" name="boo_toilet" required>
                 <option value="">Seç</option>
                 <option value="Normal">Normal</option>
                 <option value="Yumuşak">Yumuşak</option>
@@ -133,16 +131,16 @@
                 <option value="Kabızlık Benzeri">Kabızlık Benzeri</option>
             </select>
 
-            <label>Kaşıma</label>
-            <select name="boo_scratching" required>
+            <label for="boo_scratching">Kaşıma</label>
+            <select id="boo_scratching" name="boo_scratching" required>
                 <option value="">Seç</option>
                 <option value="Yok">Yok</option>
                 <option value="Hafif">Hafif</option>
                 <option value="Fazla">Fazla</option>
             </select>
 
-            <label>Not</label>
-            <textarea name="boo_notes" rows="4" placeholder="Boo bugün nasıldı?"></textarea>
+            <label for="boo_notes">Not</label>
+            <textarea id="boo_notes" name="boo_notes" rows="4" placeholder="Boo bugün nasıldı?"></textarea>
 
             <button type="submit">Boo Kaydet</button>
         </form>
