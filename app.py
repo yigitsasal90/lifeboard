@@ -63,15 +63,25 @@ def home():
         LIMIT 10
     """)
     routine_logs = c.fetchall()
-
     latest_routine = routine_logs[0] if routine_logs else None
+
+    c.execute("""
+        SELECT id, date, appetite, energy, toilet, scratching, notes
+        FROM boo_logs
+        ORDER BY id DESC
+        LIMIT 10
+    """)
+    boo_logs = c.fetchall()
+    latest_boo = boo_logs[0] if boo_logs else None
 
     conn.close()
 
     return render_template(
         "dashboard.html",
         routine_logs=routine_logs,
-        latest_routine=latest_routine
+        latest_routine=latest_routine,
+        boo_logs=boo_logs,
+        latest_boo=latest_boo
     )
 
 
@@ -90,6 +100,29 @@ def add_routine():
         INSERT INTO routine_logs (date, energy, soreness, activity, notes)
         VALUES (?, ?, ?, ?, ?)
     """, (date, energy, soreness, activity, notes))
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/")
+
+
+@app.route("/add-boo", methods=["POST"])
+def add_boo():
+    date = request.form.get("boo_date")
+    appetite = request.form.get("boo_appetite")
+    energy = request.form.get("boo_energy")
+    toilet = request.form.get("boo_toilet")
+    scratching = request.form.get("boo_scratching")
+    notes = request.form.get("boo_notes")
+
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+
+    c.execute("""
+        INSERT INTO boo_logs (date, appetite, energy, toilet, scratching, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (date, appetite, energy, toilet, scratching, notes))
 
     conn.commit()
     conn.close()
