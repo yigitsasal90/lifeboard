@@ -66,13 +66,26 @@ body {
     gap: 10px;
 }
 
+.module-form label {
+    font-weight: 600;
+    margin-top: 4px;
+}
+
 .module-form input,
 .module-form select,
 .module-form textarea {
+    width: 100%;
+    box-sizing: border-box;
     padding: 12px;
     border: 1px solid #d1d5db;
     border-radius: 8px;
     font-size: 14px;
+    background: white;
+}
+
+.module-form textarea {
+    resize: vertical;
+    min-height: 100px;
 }
 
 .module-form button {
@@ -83,11 +96,12 @@ body {
     background: #111827;
     color: white;
     font-size: 15px;
+    font-weight: 600;
     cursor: pointer;
 }
 
 .module-form button:hover {
-    opacity: 0.9;
+    opacity: 0.92;
 }
 
 .module-list {
@@ -106,12 +120,14 @@ body {
 .item-top {
     display: flex;
     justify-content: space-between;
+    gap: 12px;
     margin-bottom: 8px;
 }
 
 .notes {
     color: #4b5563;
     margin-top: 8px;
+    line-height: 1.5;
 }
 
 @media (max-width: 900px) {
