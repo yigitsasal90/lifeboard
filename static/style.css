@@ -2,12 +2,22 @@ body {
     margin: 0;
     font-family: Arial, sans-serif;
     background: #f3f4f6;
+    color: #111827;
 }
 
 .topbar {
     background: #111827;
     color: white;
     padding: 20px;
+}
+
+.topbar h1 {
+    margin: 0;
+    font-size: 28px;
+}
+
+.topbar p {
+    margin-top: 8px;
 }
 
 .container {
@@ -18,6 +28,7 @@ body {
     display: flex;
     gap: 20px;
     margin-top: 20px;
+    margin-bottom: 30px;
 }
 
 .card {
@@ -25,13 +36,86 @@ body {
     padding: 20px;
     border-radius: 10px;
     flex: 1;
-}
-.card {
     transition: all 0.2s ease;
     cursor: pointer;
 }
 
 .card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.routine-section {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.form-card,
+.list-card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    flex: 1;
+}
+
+.routine-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.routine-form input,
+.routine-form select,
+.routine-form textarea {
+    padding: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.routine-form button {
+    margin-top: 10px;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: #111827;
+    color: white;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.routine-form button:hover {
+    opacity: 0.9;
+}
+
+.routine-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.routine-item {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 14px;
+    background: #f9fafb;
+}
+
+.routine-top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.notes {
+    color: #4b5563;
+    margin-top: 8px;
+}
+
+@media (max-width: 900px) {
+    .card-grid,
+    .routine-section {
+        flex-direction: column;
+    }
 }
