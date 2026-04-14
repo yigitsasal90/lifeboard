@@ -8,58 +8,78 @@ body {
 .topbar {
     background: #111827;
     color: white;
-    padding: 20px;
+    padding: 24px 20px;
 }
 
 .topbar h1 {
     margin: 0;
-    font-size: 28px;
+    font-size: 32px;
+    font-weight: 700;
 }
 
 .topbar p {
-    margin-top: 8px;
+    margin: 8px 0 0;
+    font-size: 16px;
+    color: #d1d5db;
 }
 
 .container {
-    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px 20px 40px;
+}
+
+.container h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 22px;
 }
 
 .card-grid {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 20px;
-    margin-top: 20px;
-    margin-bottom: 30px;
+    margin-bottom: 28px;
 }
 
 .card {
     background: white;
-    padding: 20px;
-    border-radius: 10px;
-    flex: 1;
-    transition: all 0.2s ease;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    padding: 22px;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
-.card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+.card h3 {
+    margin-top: 0;
+    margin-bottom: 14px;
+    font-size: 18px;
+}
+
+.card p {
+    margin: 8px 0;
+    line-height: 1.5;
 }
 
 .module-section {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
     gap: 20px;
-    align-items: flex-start;
     margin-bottom: 24px;
 }
 
 .form-card,
 .list-card {
     background: white;
-    padding: 20px;
-    border-radius: 10px;
-    flex: 1;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    padding: 22px;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.form-card h3,
+.list-card h3 {
+    margin-top: 0;
+    margin-bottom: 18px;
+    font-size: 20px;
 }
 
 .module-form {
@@ -78,23 +98,24 @@ body {
 .module-form textarea {
     width: 100%;
     box-sizing: border-box;
-    padding: 12px;
+    padding: 12px 14px;
     border: 1px solid #d1d5db;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 14px;
     background: white;
+    color: #111827;
 }
 
 .module-form textarea {
     resize: vertical;
-    min-height: 100px;
+    min-height: 110px;
 }
 
 .module-form button {
-    margin-top: 10px;
-    padding: 12px;
+    margin-top: 12px;
+    padding: 13px 16px;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     background: #111827;
     color: white;
     font-size: 15px;
@@ -103,7 +124,7 @@ body {
 }
 
 .module-form button:hover {
-    opacity: 0.92;
+    opacity: 0.94;
 }
 
 .module-list {
@@ -122,6 +143,7 @@ body {
 .item-top {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     gap: 12px;
     margin-bottom: 8px;
 }
@@ -132,9 +154,9 @@ body {
     line-height: 1.5;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
     .card-grid,
     .module-section {
-        flex-direction: column;
+        grid-template-columns: 1fr;
     }
 }
