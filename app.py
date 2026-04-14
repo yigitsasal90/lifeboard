@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect
 import sqlite3
 import os
 
@@ -6,11 +6,12 @@ app = Flask(__name__)
 
 DB_NAME = "lifeboard.db"
 
+
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
 
-    c.execute('''
+    c.execute("""
         CREATE TABLE IF NOT EXISTS routine_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT,
@@ -19,9 +20,9 @@ def init_db():
             activity TEXT,
             notes TEXT
         )
-    ''')
+    """)
 
-    c.execute('''
+    c.execute("""
         CREATE TABLE IF NOT EXISTS boo_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT,
@@ -31,9 +32,9 @@ def init_db():
             scratching TEXT,
             notes TEXT
         )
-    ''')
+    """)
 
-    c.execute('''
+    c.execute("""
         CREATE TABLE IF NOT EXISTS finance_snapshots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT,
@@ -43,14 +44,52 @@ def init_db():
             interest REAL,
             comment TEXT
         )
-    ''')
+    """)
 
     conn.commit()
     conn.close()
 
+
 @app.route("/")
 def home():
-    return render_template("dashboard.html")
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+
+    c.execute("""
+        SELECT id, date, energy, soreness, activity, notes
+        FROM routine_logs
+        ORDER BY id DESC
+        LIMIT 10
+    """)
+    routine_logs = c.fetchall()
+
+    conn.close()
+
+    return render_template("dashboard.html", routine_logs=routine_logs)
+
+
+@app.route("/add-routine", methods=["POST"])
+def add_routine():
+    date = request.form.get("date")
+    energy = request.form.get("energy")
+    soreness = request.form.get("soreness")
+    activity = request.form.get("activity")
+    notes = request.form.get("notes")
+
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+
+    c.execute("""
+        INSERT INTO routine_logs (date, energy, soreness, activity, notes)
+        VALUES (?, ?, ?, ?, ?)
+    """, (date, energy, soreness, activity, notes))
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/")
+
 
 init_db()
 
