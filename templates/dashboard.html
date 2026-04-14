@@ -19,4 +19,70 @@
         <p>Piyasa özeti</p>
     </div>
 </div>
+
+<section class="routine-section">
+    <div class="form-card">
+        <h3>Routine Kaydı Ekle</h3>
+
+        <form action="/add-routine" method="POST" class="routine-form">
+            <label>Tarih</label>
+            <input type="date" name="date" required>
+
+            <label>Enerji</label>
+            <select name="energy" required>
+                <option value="">Seç</option>
+                <option value="Düşük">Düşük</option>
+                <option value="Orta">Orta</option>
+                <option value="Yüksek">Yüksek</option>
+            </select>
+
+            <label>Kas Ağrısı</label>
+            <select name="soreness" required>
+                <option value="">Seç</option>
+                <option value="Yok">Yok</option>
+                <option value="Hafif">Hafif</option>
+                <option value="Belirgin">Belirgin</option>
+            </select>
+
+            <label>Aktivite</label>
+            <select name="activity" required>
+                <option value="">Seç</option>
+                <option value="Dinlenme">Dinlenme</option>
+                <option value="Yürüyüş">Yürüyüş</option>
+                <option value="Mobilite">Mobilite</option>
+                <option value="Direnç Bandı">Direnç Bandı</option>
+                <option value="Halı Saha">Halı Saha</option>
+                <option value="Padel">Padel</option>
+            </select>
+
+            <label>Not</label>
+            <textarea name="notes" rows="4" placeholder="Bugün nasıl hissettin?"></textarea>
+
+            <button type="submit">Kaydet</button>
+        </form>
+    </div>
+
+    <div class="list-card">
+        <h3>Son Routine Kayıtları</h3>
+
+        {% if routine_logs %}
+            <div class="routine-list">
+                {% for log in routine_logs %}
+                    <div class="routine-item">
+                        <div class="routine-top">
+                            <strong>{{ log['date'] }}</strong>
+                            <span>{{ log['activity'] }}</span>
+                        </div>
+                        <p>Enerji: {{ log['energy'] }} | Kas Ağrısı: {{ log['soreness'] }}</p>
+                        {% if log['notes'] %}
+                            <p class="notes">{{ log['notes'] }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>Henüz routine kaydı yok.</p>
+        {% endif %}
+    </div>
+</section>
 {% endblock %}
