@@ -18,20 +18,27 @@
 
     <div class="card">
         <h3>Boo</h3>
-        <p>Boo’nun günlük durumu</p>
+
+        {% if latest_boo %}
+            <p><strong>İştah:</strong> {{ latest_boo['appetite'] }}</p>
+            <p><strong>Enerji:</strong> {{ latest_boo['energy'] }}</p>
+            <p><strong>Tuvalet:</strong> {{ latest_boo['toilet'] }}</p>
+        {% else %}
+            <p>Henüz Boo kaydı yok.</p>
+        {% endif %}
     </div>
 
     <div class="card">
         <h3>Finance</h3>
-        <p>Piyasa özeti</p>
+        <p>Piyasa özeti yakında burada olacak.</p>
     </div>
 </div>
 
-<section class="routine-section">
+<section class="module-section">
     <div class="form-card">
         <h3>Routine Kaydı Ekle</h3>
 
-        <form action="/add-routine" method="POST" class="routine-form">
+        <form action="/add-routine" method="POST" class="module-form">
             <label>Tarih</label>
             <input type="date" name="date" required>
 
@@ -65,7 +72,7 @@
             <label>Not</label>
             <textarea name="notes" rows="4" placeholder="Bugün nasıl hissettin?"></textarea>
 
-            <button type="submit">Kaydet</button>
+            <button type="submit">Routine Kaydet</button>
         </form>
     </div>
 
@@ -73,10 +80,10 @@
         <h3>Son Routine Kayıtları</h3>
 
         {% if routine_logs %}
-            <div class="routine-list">
+            <div class="module-list">
                 {% for log in routine_logs %}
-                    <div class="routine-item">
-                        <div class="routine-top">
+                    <div class="module-item">
+                        <div class="item-top">
                             <strong>{{ log['date'] }}</strong>
                             <span>{{ log['activity'] }}</span>
                         </div>
@@ -89,6 +96,78 @@
             </div>
         {% else %}
             <p>Henüz routine kaydı yok.</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="module-section">
+    <div class="form-card">
+        <h3>Boo Kaydı Ekle</h3>
+
+        <form action="/add-boo" method="POST" class="module-form">
+            <label>Tarih</label>
+            <input type="date" name="boo_date" required>
+
+            <label>İştah</label>
+            <select name="boo_appetite" required>
+                <option value="">Seç</option>
+                <option value="İyi">İyi</option>
+                <option value="Orta">Orta</option>
+                <option value="Düşük">Düşük</option>
+            </select>
+
+            <label>Enerji</label>
+            <select name="boo_energy" required>
+                <option value="">Seç</option>
+                <option value="Normal">Normal</option>
+                <option value="Düşük">Düşük</option>
+                <option value="Çok Hareketli">Çok Hareketli</option>
+            </select>
+
+            <label>Tuvalet</label>
+            <select name="boo_toilet" required>
+                <option value="">Seç</option>
+                <option value="Normal">Normal</option>
+                <option value="Yumuşak">Yumuşak</option>
+                <option value="İshal">İshal</option>
+                <option value="Kabızlık Benzeri">Kabızlık Benzeri</option>
+            </select>
+
+            <label>Kaşıma</label>
+            <select name="boo_scratching" required>
+                <option value="">Seç</option>
+                <option value="Yok">Yok</option>
+                <option value="Hafif">Hafif</option>
+                <option value="Fazla">Fazla</option>
+            </select>
+
+            <label>Not</label>
+            <textarea name="boo_notes" rows="4" placeholder="Boo bugün nasıldı?"></textarea>
+
+            <button type="submit">Boo Kaydet</button>
+        </form>
+    </div>
+
+    <div class="list-card">
+        <h3>Son Boo Kayıtları</h3>
+
+        {% if boo_logs %}
+            <div class="module-list">
+                {% for log in boo_logs %}
+                    <div class="module-item">
+                        <div class="item-top">
+                            <strong>{{ log['date'] }}</strong>
+                            <span>{{ log['energy'] }}</span>
+                        </div>
+                        <p>İştah: {{ log['appetite'] }} | Tuvalet: {{ log['toilet'] }} | Kaşıma: {{ log['scratching'] }}</p>
+                        {% if log['notes'] %}
+                            <p class="notes">{{ log['notes'] }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>Henüz Boo kaydı yok.</p>
         {% endif %}
     </div>
 </section>
