@@ -64,9 +64,15 @@ def home():
     """)
     routine_logs = c.fetchall()
 
+    latest_routine = routine_logs[0] if routine_logs else None
+
     conn.close()
 
-    return render_template("dashboard.html", routine_logs=routine_logs)
+    return render_template(
+        "dashboard.html",
+        routine_logs=routine_logs,
+        latest_routine=latest_routine
+    )
 
 
 @app.route("/add-routine", methods=["POST"])
