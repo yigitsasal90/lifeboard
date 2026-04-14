@@ -74,6 +74,15 @@ def home():
     boo_logs = c.fetchall()
     latest_boo = boo_logs[0] if boo_logs else None
 
+    c.execute("""
+        SELECT id, date, usd, eur, gold, interest, comment
+        FROM finance_snapshots
+        ORDER BY id DESC
+        LIMIT 10
+    """)
+    finance_logs = c.fetchall()
+    latest_finance = finance_logs[0] if finance_logs else None
+
     conn.close()
 
     return render_template(
@@ -81,7 +90,9 @@ def home():
         routine_logs=routine_logs,
         latest_routine=latest_routine,
         boo_logs=boo_logs,
-        latest_boo=latest_boo
+        latest_boo=latest_boo,
+        finance_logs=finance_logs,
+        latest_finance=latest_finance
     )
 
 
@@ -123,6 +134,29 @@ def add_boo():
         INSERT INTO boo_logs (date, appetite, energy, toilet, scratching, notes)
         VALUES (?, ?, ?, ?, ?, ?)
     """, (date, appetite, energy, toilet, scratching, notes))
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/")
+
+
+@app.route("/add-finance", methods=["POST"])
+def add_finance():
+    date = request.form.get("finance_date")
+    usd = request.form.get("finance_usd")
+    eur = request.form.get("finance_eur")
+    gold = request.form.get("finance_gold")
+    interest = request.form.get("finance_interest")
+    comment = request.form.get("finance_comment")
+
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+
+    c.execute("""
+        INSERT INTO finance_snapshots (date, usd, eur, gold, interest, comment)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (date, usd, eur, gold, interest, comment))
 
     conn.commit()
     conn.close()
