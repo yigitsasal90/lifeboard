@@ -45,10 +45,11 @@ body {
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 
-.routine-section {
+.module-section {
     display: flex;
     gap: 20px;
     align-items: flex-start;
+    margin-bottom: 24px;
 }
 
 .form-card,
@@ -59,22 +60,22 @@ body {
     flex: 1;
 }
 
-.routine-form {
+.module-form {
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
-.routine-form input,
-.routine-form select,
-.routine-form textarea {
+.module-form input,
+.module-form select,
+.module-form textarea {
     padding: 12px;
     border: 1px solid #d1d5db;
     border-radius: 8px;
     font-size: 14px;
 }
 
-.routine-form button {
+.module-form button {
     margin-top: 10px;
     padding: 12px;
     border: none;
@@ -85,24 +86,24 @@ body {
     cursor: pointer;
 }
 
-.routine-form button:hover {
+.module-form button:hover {
     opacity: 0.9;
 }
 
-.routine-list {
+.module-list {
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
-.routine-item {
+.module-item {
     border: 1px solid #e5e7eb;
     border-radius: 10px;
     padding: 14px;
     background: #f9fafb;
 }
 
-.routine-top {
+.item-top {
     display: flex;
     justify-content: space-between;
     margin-bottom: 8px;
@@ -115,7 +116,7 @@ body {
 
 @media (max-width: 900px) {
     .card-grid,
-    .routine-section {
+    .module-section {
         flex-direction: column;
     }
 }
