@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect
 import sqlite3
 import os
+import json
 
 app = Flask(__name__)
 
@@ -50,6 +51,16 @@ def init_db():
     conn.close()
 
 
+def energy_to_number(value):
+    if value == "Düşük":
+        return 1
+    if value == "Orta":
+        return 2
+    if value == "Yüksek":
+        return 3
+    return 0
+
+
 @app.route("/")
 def home():
     conn = sqlite3.connect(DB_NAME)
@@ -62,8 +73,8 @@ def home():
         ORDER BY id DESC
         LIMIT 10
     """)
-    routine_logs = c.fetchall()
-    latest_routine = routine_logs[0] if routine_logs else None
+    routine_logs_desc = c.fetchall()
+    latest_routine = routine_logs_desc[0] if routine_logs_desc else None
 
     c.execute("""
         SELECT id, date, appetite, energy, toilet, scratching, notes
@@ -71,8 +82,8 @@ def home():
         ORDER BY id DESC
         LIMIT 10
     """)
-    boo_logs = c.fetchall()
-    latest_boo = boo_logs[0] if boo_logs else None
+    boo_logs_desc = c.fetchall()
+    latest_boo = boo_logs_desc[0] if boo_logs_desc else None
 
     c.execute("""
         SELECT id, date, usd, eur, gold, interest, comment
@@ -80,10 +91,26 @@ def home():
         ORDER BY id DESC
         LIMIT 10
     """)
-    finance_logs = c.fetchall()
-    latest_finance = finance_logs[0] if finance_logs else None
+    finance_logs_desc = c.fetchall()
+    latest_finance = finance_logs_desc[0] if finance_logs_desc else None
+
+    c.execute("""
+        SELECT date, energy
+        FROM routine_logs
+        ORDER BY id DESC
+        LIMIT 7
+    """)
+    chart_rows_desc = c.fetchall()
 
     conn.close()
+
+    routine_logs = list(routine_logs_desc)
+    boo_logs = list(boo_logs_desc)
+    finance_logs = list(finance_logs_desc)
+
+    chart_rows = list(reversed(chart_rows_desc))
+    chart_labels = [row["date"] for row in chart_rows]
+    chart_values = [energy_to_number(row["energy"]) for row in chart_rows]
 
     return render_template(
         "dashboard.html",
@@ -92,7 +119,9 @@ def home():
         boo_logs=boo_logs,
         latest_boo=latest_boo,
         finance_logs=finance_logs,
-        latest_finance=latest_finance
+        latest_finance=latest_finance,
+        chart_labels=json.dumps(chart_labels, ensure_ascii=False),
+        chart_values=json.dumps(chart_values)
     )
 
 
