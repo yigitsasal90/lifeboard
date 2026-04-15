@@ -326,7 +326,7 @@ body {
     width: 138px;
     height: 138px;
     border-radius: 50%;
-    background: conic-gradient(var(--accent) 0 210deg, rgba(255,255,255,0.08) 210deg 360deg);
+    background: conic-gradient(var(--accent) 0 calc(var(--score-angle, 180deg)), rgba(255,255,255,0.08) calc(var(--score-angle, 180deg)) 360deg);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -371,6 +371,17 @@ body {
 
 .chart-card {
     margin-bottom: 24px;
+}
+
+.empty-chart {
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 18px;
+    background: var(--panel-soft);
+    border: 1px dashed var(--border);
+    color: var(--muted);
 }
 
 form {
