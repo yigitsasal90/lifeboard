@@ -82,15 +82,15 @@
     <div class="highlight-card">
         <div class="ring-score">
             <div class="ring-inner">
-                <strong>{{ 40 + (streak * 5) }}</strong>
+                <strong>{{ score }}</strong>
                 <span>/100</span>
             </div>
         </div>
 
         <div class="highlight-text">
             <h3>Günlük skorun</h3>
-            <p>{{ 40 + (streak * 5) }}/100</p>
-            <strong>İyi ama geliştirilebilir.</strong>
+            <p>{{ score }}/100</p>
+            <strong>{{ score_text }}</strong>
         </div>
     </div>
 
@@ -106,10 +106,12 @@
         <span class="section-sub">Son 30 kayıt</span>
     </div>
 
-    {% if chart_labels and chart_values %}
+    {% if routine_rows %}
         <canvas id="energyChart" height="110"></canvas>
     {% else %}
-        <p>Grafik için henüz routine kaydı yok.</p>
+        <div class="empty-chart">
+            <p>Henüz veri yok. İlk routine kaydından sonra grafik burada oluşacak.</p>
+        </div>
     {% endif %}
 </section>
 
@@ -328,7 +330,6 @@
     {% endif %}
 </section>
 
-{% if chart_labels and chart_values %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const labels = {{ chart_labels | safe }};
@@ -406,7 +407,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const cardDate = new Date(card.dataset.date);
             const diff = Math.floor((today - cardDate) / (1000 * 60 * 60 * 24));
-
             card.style.display = diff <= Number(days) ? "block" : "none";
         });
     }
@@ -431,5 +431,4 @@ document.addEventListener("DOMContentLoaded", function () {
     applyFilter("winnieHistory", 7);
 });
 </script>
-{% endif %}
 {% endblock %}
