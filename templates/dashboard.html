@@ -41,7 +41,7 @@
 <div class="chart-card">
     <h3>Enerji Grafiği</h3>
     {% if chart_labels and chart_values %}
-        <canvas id="energyChart"></canvas>
+        <canvas id="energyChart" height="100"></canvas>
     {% else %}
         <p>Grafik için henüz routine kaydı yok.</p>
     {% endif %}
@@ -238,51 +238,50 @@
 
 {% if chart_labels and chart_values %}
 <script>
-    const chartLabels = {{ chart_labels | safe }};
-    const chartValues = {{ chart_values | safe }};
+document.addEventListener("DOMContentLoaded", function () {
+    const labels = {{ chart_labels | safe }};
+    const values = {{ chart_values | safe }};
+    const canvas = document.getElementById("energyChart");
 
-    const ctx = document.getElementById('energyChart');
+    if (!canvas || !labels.length || !values.length) {
+        return;
+    }
 
-    if (ctx) {
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: chartLabels,
-                datasets: [{
-                    label: 'Enerji',
-                    data: chartValues,
-                    borderColor: '#111827',
-                    backgroundColor: 'rgba(17, 24, 39, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.3,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        display: true
-                    }
-                },
-                scales: {
-                    y: {
-                        min: 1,
-                        max: 3,
-                        ticks: {
-                            stepSize: 1,
-                            callback: function(value) {
-                                if (value === 1) return 'Düşük';
-                                if (value === 2) return 'Orta';
-                                if (value === 3) return 'Yüksek';
-                                return value;
-                            }
+    new Chart(canvas, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Enerji",
+                data: values,
+                borderColor: "#111827",
+                backgroundColor: "rgba(17, 24, 39, 0.10)",
+                borderWidth: 2,
+                tension: 0.35,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    min: 1,
+                    max: 3,
+                    ticks: {
+                        stepSize: 1,
+                        callback: function(value) {
+                            if (value === 1) return "Düşük";
+                            if (value === 2) return "Orta";
+                            if (value === 3) return "Yüksek";
+                            return value;
                         }
                     }
                 }
             }
-        });
-    }
+        }
+    });
+});
 </script>
 {% endif %}
 {% endblock %}
