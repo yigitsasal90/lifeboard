@@ -1,17 +1,15 @@
 {% extends "base.html" %}
 
 {% block content %}
-
 <h2 class="welcome">Hoş geldin 👋</h2>
 
 <div class="cards">
-
     <div class="card">
         <h3>Routine</h3>
         {% if last_routine %}
-            <p>Enerji: {{ last_routine.energy }}</p>
-            <p>Aktivite: {{ last_routine.activity }}</p>
-            <p>Kas Ağrısı: {{ last_routine.pain }}</p>
+            <p><strong>Enerji:</strong> {{ last_routine.energy }}</p>
+            <p><strong>Aktivite:</strong> {{ last_routine.activity }}</p>
+            <p><strong>Kas Ağrısı:</strong> {{ last_routine.pain }}</p>
         {% else %}
             <p>Kayıt yok</p>
         {% endif %}
@@ -20,9 +18,9 @@
     <div class="card">
         <h3>Winnie</h3>
         {% if last_winnie %}
-            <p>İştah: {{ last_winnie.appetite }}</p>
-            <p>Enerji: {{ last_winnie.energy }}</p>
-            <p>Tuvalet: {{ last_winnie.toilet }}</p>
+            <p><strong>İştah:</strong> {{ last_winnie.appetite }}</p>
+            <p><strong>Enerji:</strong> {{ last_winnie.energy }}</p>
+            <p><strong>Tuvalet:</strong> {{ last_winnie.toilet }}</p>
         {% else %}
             <p>Kayıt yok</p>
         {% endif %}
@@ -31,97 +29,160 @@
     <div class="card">
         <h3>Finance</h3>
         {% if finance %}
-            <p>USD: {{ finance.usd }}</p>
-            <p>EUR: {{ finance.eur }}</p>
-            <p>GBP: {{ finance.gbp }}</p>
-            <p>Gram: {{ finance.gram }}</p>
-            <p>Faiz: %{{ finance.faiz }}</p>
+            <p><strong>USD:</strong> {{ finance.usd }}</p>
+            <p><strong>EUR:</strong> {{ finance.eur }}</p>
+            <p><strong>GBP:</strong> {{ finance.gbp }}</p>
+            <p><strong>Gram:</strong> {{ finance.gram }}</p>
+            <p><strong>Çeyrek:</strong> {{ finance.ceyrek }}</p>
+            <p><strong>Tam:</strong> {{ finance.tam }}</p>
+            <p><strong>Faiz:</strong> %{{ finance.faiz }}</p>
+        {% else %}
+            <p>Kayıt yok</p>
         {% endif %}
     </div>
-
 </div>
 
-<div class="grid">
+<div class="form-card">
+    <h3>Routine Kaydı</h3>
+    <form method="POST" action="/add_routine">
+        <input type="date" name="date" required>
 
-    <div class="left">
+        <select name="energy" required>
+            <option value="">Enerji seç</option>
+            <option value="Düşük">Düşük</option>
+            <option value="Orta">Orta</option>
+            <option value="Yüksek">Yüksek</option>
+        </select>
 
-        <div class="form-card">
-            <h3>Routine Kaydı</h3>
-            <form method="POST" action="/add_routine">
-                <input type="date" name="date" required>
+        <select name="pain" required>
+            <option value="">Kas ağrısı seç</option>
+            <option value="Yok">Yok</option>
+            <option value="Hafif">Hafif</option>
+            <option value="Orta">Orta</option>
+            <option value="Belirgin">Belirgin</option>
+        </select>
 
-                <select name="energy">
-                    <option>Düşük</option>
-                    <option>Orta</option>
-                    <option>Yüksek</option>
-                </select>
+        <select name="activity" required>
+            <option value="">Aktivite seç</option>
+            <option value="Padel">🎾 Padel</option>
+            <option value="Futbol">⚽ Futbol</option>
+            <option value="Fonksiyonel Antrenman">🏋️ Fonksiyonel Antrenman</option>
+            <option value="Direnç Bandı">🟠 Direnç Bandı</option>
+            <option value="Yürüyüş">🚶 Yürüyüş</option>
+            <option value="E-Scooter">🛴 E-Scooter</option>
+            <option value="Dinlenme">🛌 Dinlenme</option>
+        </select>
 
-                <select name="pain">
-                    <option>Yok</option>
-                    <option>Hafif</option>
-                    <option>Orta</option>
-                </select>
+        <textarea name="note" placeholder="Bugün nasıldı?"></textarea>
 
-                <select name="activity">
-                    <option>Yürüyüş</option>
-                    <option>Fonksiyonel Antrenman</option>
-                    <option>E-Scooter</option>
-                </select>
+        <button type="submit">Kaydet</button>
+    </form>
+</div>
 
-                <textarea name="note" placeholder="Bugün nasıldı?"></textarea>
+<div class="two-col">
+    <div class="form-card">
+        <h3>Winnie Kaydı</h3>
+        <form method="POST" action="/add_winnie">
+            <input type="date" name="date" required>
 
-                <button>Kaydet</button>
-            </form>
-        </div>
+            <select name="appetite" required>
+                <option value="">İştah seç</option>
+                <option value="Kötü">Kötü</option>
+                <option value="Orta">Orta</option>
+                <option value="İyi">İyi</option>
+            </select>
 
-        <div class="form-card">
-            <h3>Winnie Kaydı</h3>
-            <form method="POST" action="/add_winnie">
-                <input type="date" name="date" required>
+            <select name="energy" required>
+                <option value="">Enerji seç</option>
+                <option value="Düşük">Düşük</option>
+                <option value="Normal">Normal</option>
+                <option value="Yüksek">Yüksek</option>
+            </select>
 
-                <select name="appetite">
-                    <option>Kötü</option>
-                    <option>Orta</option>
-                    <option>İyi</option>
-                </select>
+            <select name="toilet" required>
+                <option value="">Tuvalet seç</option>
+                <option value="Normal">Normal</option>
+                <option value="Problemli">Problemli</option>
+            </select>
 
-                <select name="energy">
-                    <option>Düşük</option>
-                    <option>Normal</option>
-                    <option>Yüksek</option>
-                </select>
+            <select name="itch" required>
+                <option value="">Kaşıma seç</option>
+                <option value="Yok">Yok</option>
+                <option value="Var">Var</option>
+            </select>
 
-                <select name="toilet">
-                    <option>Normal</option>
-                    <option>Problemli</option>
-                </select>
+            <textarea name="note" placeholder="Winnie bugün nasıldı?"></textarea>
 
-                <select name="itch">
-                    <option>Yok</option>
-                    <option>Var</option>
-                </select>
-
-                <textarea name="note"></textarea>
-
-                <button>Kaydet</button>
-            </form>
-        </div>
-
-        <div class="form-card">
-            <h3>Aşı Takvimi</h3>
-            <form method="POST" action="/add_vaccine">
-                <input type="date" name="date">
-                <input type="text" name="name" placeholder="Aşı adı">
-                <button>Ekle</button>
-            </form>
-
-            {% for v in vaccines %}
-                <p>{{ v.date }} - {{ v.name }}</p>
-            {% endfor %}
-        </div>
-
+            <button type="submit">Kaydet</button>
+        </form>
     </div>
 
+    <div class="form-card">
+        <h3>Aşı Takvimi</h3>
+        <form method="POST" action="/add_vaccine">
+            <input type="date" name="date" required>
+            <input type="text" name="name" placeholder="Aşı adı" required>
+            <button type="submit">Ekle</button>
+        </form>
+
+        <div class="list-box">
+            {% if vaccines %}
+                {% for v in vaccines %}
+                    <div class="list-item">
+                        <strong>{{ v.date }}</strong>
+                        <span>{{ v.name }}</span>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p>Henüz aşı kaydı yok.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="form-card finance-box">
+    <h3>Canlı Finance Özeti</h3>
+
+    {% if finance %}
+        <div class="finance-grid">
+            <div class="mini-finance-card">
+                <span>Dolar</span>
+                <strong>{{ finance.usd }}</strong>
+            </div>
+
+            <div class="mini-finance-card">
+                <span>Euro</span>
+                <strong>{{ finance.eur }}</strong>
+            </div>
+
+            <div class="mini-finance-card">
+                <span>Sterlin</span>
+                <strong>{{ finance.gbp }}</strong>
+            </div>
+
+            <div class="mini-finance-card">
+                <span>Gram Altın</span>
+                <strong>{{ finance.gram }}</strong>
+            </div>
+
+            <div class="mini-finance-card">
+                <span>Çeyrek Altın</span>
+                <strong>{{ finance.ceyrek }}</strong>
+            </div>
+
+            <div class="mini-finance-card">
+                <span>Tam Altın</span>
+                <strong>{{ finance.tam }}</strong>
+            </div>
+
+            <div class="mini-finance-card">
+                <span>Akbank Faiz</span>
+                <strong>%{{ finance.faiz }}</strong>
+            </div>
+        </div>
+    {% else %}
+        <p>Finance verisi şu anda alınamadı.</p>
+    {% endif %}
 </div>
 
 {% endblock %}
