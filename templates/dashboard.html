@@ -1,287 +1,127 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Hoş geldin 👋</h2>
 
-<div class="card-grid">
+<h2 class="welcome">Hoş geldin 👋</h2>
+
+<div class="cards">
+
     <div class="card">
         <h3>Routine</h3>
-        {% if latest_routine %}
-            <p><strong>Enerji:</strong> {{ latest_routine['energy'] }}</p>
-            <p><strong>Aktivite:</strong> {{ latest_routine['activity'] }}</p>
-            <p><strong>Kas Ağrısı:</strong> {{ latest_routine['soreness'] }}</p>
+        {% if last_routine %}
+            <p>Enerji: {{ last_routine.energy }}</p>
+            <p>Aktivite: {{ last_routine.activity }}</p>
+            <p>Kas Ağrısı: {{ last_routine.pain }}</p>
         {% else %}
-            <p>Henüz routine kaydı yok.</p>
+            <p>Kayıt yok</p>
         {% endif %}
     </div>
 
     <div class="card">
-        <h3>Boo</h3>
-        {% if latest_boo %}
-            <p><strong>İştah:</strong> {{ latest_boo['appetite'] }}</p>
-            <p><strong>Enerji:</strong> {{ latest_boo['energy'] }}</p>
-            <p><strong>Tuvalet:</strong> {{ latest_boo['toilet'] }}</p>
+        <h3>Winnie</h3>
+        {% if last_winnie %}
+            <p>İştah: {{ last_winnie.appetite }}</p>
+            <p>Enerji: {{ last_winnie.energy }}</p>
+            <p>Tuvalet: {{ last_winnie.toilet }}</p>
         {% else %}
-            <p>Henüz Boo kaydı yok.</p>
+            <p>Kayıt yok</p>
         {% endif %}
     </div>
 
     <div class="card">
         <h3>Finance</h3>
-        {% if latest_finance %}
-            <p><strong>USD:</strong> {{ latest_finance['usd'] }}</p>
-            <p><strong>EUR:</strong> {{ latest_finance['eur'] }}</p>
-            <p><strong>Altın:</strong> {{ latest_finance['gold'] }}</p>
-        {% else %}
-            <p>Henüz finance kaydı yok.</p>
+        {% if finance %}
+            <p>USD: {{ finance.usd }}</p>
+            <p>EUR: {{ finance.eur }}</p>
+            <p>GBP: {{ finance.gbp }}</p>
+            <p>Gram: {{ finance.gram }}</p>
+            <p>Faiz: %{{ finance.faiz }}</p>
         {% endif %}
     </div>
+
 </div>
 
-<div class="chart-card">
-    <h3>Enerji Grafiği</h3>
-    {% if chart_labels and chart_values %}
-        <canvas id="energyChart" height="100"></canvas>
-    {% else %}
-        <p>Grafik için henüz routine kaydı yok.</p>
-    {% endif %}
+<div class="grid">
+
+    <div class="left">
+
+        <div class="form-card">
+            <h3>Routine Kaydı</h3>
+            <form method="POST" action="/add_routine">
+                <input type="date" name="date" required>
+
+                <select name="energy">
+                    <option>Düşük</option>
+                    <option>Orta</option>
+                    <option>Yüksek</option>
+                </select>
+
+                <select name="pain">
+                    <option>Yok</option>
+                    <option>Hafif</option>
+                    <option>Orta</option>
+                </select>
+
+                <select name="activity">
+                    <option>Yürüyüş</option>
+                    <option>Fonksiyonel Antrenman</option>
+                    <option>E-Scooter</option>
+                </select>
+
+                <textarea name="note" placeholder="Bugün nasıldı?"></textarea>
+
+                <button>Kaydet</button>
+            </form>
+        </div>
+
+        <div class="form-card">
+            <h3>Winnie Kaydı</h3>
+            <form method="POST" action="/add_winnie">
+                <input type="date" name="date" required>
+
+                <select name="appetite">
+                    <option>Kötü</option>
+                    <option>Orta</option>
+                    <option>İyi</option>
+                </select>
+
+                <select name="energy">
+                    <option>Düşük</option>
+                    <option>Normal</option>
+                    <option>Yüksek</option>
+                </select>
+
+                <select name="toilet">
+                    <option>Normal</option>
+                    <option>Problemli</option>
+                </select>
+
+                <select name="itch">
+                    <option>Yok</option>
+                    <option>Var</option>
+                </select>
+
+                <textarea name="note"></textarea>
+
+                <button>Kaydet</button>
+            </form>
+        </div>
+
+        <div class="form-card">
+            <h3>Aşı Takvimi</h3>
+            <form method="POST" action="/add_vaccine">
+                <input type="date" name="date">
+                <input type="text" name="name" placeholder="Aşı adı">
+                <button>Ekle</button>
+            </form>
+
+            {% for v in vaccines %}
+                <p>{{ v.date }} - {{ v.name }}</p>
+            {% endfor %}
+        </div>
+
+    </div>
+
 </div>
 
-<section class="module-section">
-    <div class="form-card">
-        <h3>Routine Kaydı Ekle</h3>
-
-        <form action="/add-routine" method="POST" class="module-form">
-            <label for="date">Tarih</label>
-            <input id="date" type="date" name="date" required>
-
-            <label for="energy">Enerji</label>
-            <select id="energy" name="energy" required>
-                <option value="">Seç</option>
-                <option value="Düşük">Düşük</option>
-                <option value="Orta">Orta</option>
-                <option value="Yüksek">Yüksek</option>
-            </select>
-
-            <label for="soreness">Kas Ağrısı</label>
-            <select id="soreness" name="soreness" required>
-                <option value="">Seç</option>
-                <option value="Yok">Yok</option>
-                <option value="Hafif">Hafif</option>
-                <option value="Belirgin">Belirgin</option>
-            </select>
-
-            <label for="activity">Aktivite</label>
-            <select id="activity" name="activity" required>
-                <option value="">Seç</option>
-                <option value="Dinlenme">Dinlenme</option>
-                <option value="Yürüyüş">Yürüyüş</option>
-                <option value="Mobilite">Mobilite</option>
-                <option value="Direnç Bandı">Direnç Bandı</option>
-                <option value="Halı Saha">Halı Saha</option>
-                <option value="Padel">Padel</option>
-            </select>
-
-            <label for="notes">Not</label>
-            <textarea id="notes" name="notes" rows="4" placeholder="Bugün nasıl hissettin?"></textarea>
-
-            <button type="submit">Routine Kaydet</button>
-        </form>
-    </div>
-
-    <div class="list-card">
-        <h3>Son Routine Kayıtları</h3>
-
-        {% if routine_logs %}
-            <div class="module-list">
-                {% for log in routine_logs %}
-                    <div class="module-item">
-                        <div class="item-top">
-                            <strong>{{ log['date'] }}</strong>
-                            <span>{{ log['activity'] }}</span>
-                        </div>
-                        <p>Enerji: {{ log['energy'] }} | Kas Ağrısı: {{ log['soreness'] }}</p>
-                        {% if log['notes'] %}
-                            <p class="notes">{{ log['notes'] }}</p>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <p>Henüz routine kaydı yok.</p>
-        {% endif %}
-    </div>
-</section>
-
-<section class="module-section">
-    <div class="form-card">
-        <h3>Boo Kaydı Ekle</h3>
-
-        <form action="/add-boo" method="POST" class="module-form">
-            <label for="boo_date">Tarih</label>
-            <input id="boo_date" type="date" name="boo_date" required>
-
-            <label for="boo_appetite">İştah</label>
-            <select id="boo_appetite" name="boo_appetite" required>
-                <option value="">Seç</option>
-                <option value="İyi">İyi</option>
-                <option value="Orta">Orta</option>
-                <option value="Düşük">Düşük</option>
-            </select>
-
-            <label for="boo_energy">Enerji</label>
-            <select id="boo_energy" name="boo_energy" required>
-                <option value="">Seç</option>
-                <option value="Normal">Normal</option>
-                <option value="Düşük">Düşük</option>
-                <option value="Çok Hareketli">Çok Hareketli</option>
-            </select>
-
-            <label for="boo_toilet">Tuvalet</label>
-            <select id="boo_toilet" name="boo_toilet" required>
-                <option value="">Seç</option>
-                <option value="Normal">Normal</option>
-                <option value="Yumuşak">Yumuşak</option>
-                <option value="İshal">İshal</option>
-                <option value="Kabızlık Benzeri">Kabızlık Benzeri</option>
-            </select>
-
-            <label for="boo_scratching">Kaşıma</label>
-            <select id="boo_scratching" name="boo_scratching" required>
-                <option value="">Seç</option>
-                <option value="Yok">Yok</option>
-                <option value="Hafif">Hafif</option>
-                <option value="Fazla">Fazla</option>
-            </select>
-
-            <label for="boo_notes">Not</label>
-            <textarea id="boo_notes" name="boo_notes" rows="4" placeholder="Boo bugün nasıldı?"></textarea>
-
-            <button type="submit">Boo Kaydet</button>
-        </form>
-    </div>
-
-    <div class="list-card">
-        <h3>Son Boo Kayıtları</h3>
-
-        {% if boo_logs %}
-            <div class="module-list">
-                {% for log in boo_logs %}
-                    <div class="module-item">
-                        <div class="item-top">
-                            <strong>{{ log['date'] }}</strong>
-                            <span>{{ log['energy'] }}</span>
-                        </div>
-                        <p>İştah: {{ log['appetite'] }} | Tuvalet: {{ log['toilet'] }} | Kaşıma: {{ log['scratching'] }}</p>
-                        {% if log['notes'] %}
-                            <p class="notes">{{ log['notes'] }}</p>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <p>Henüz Boo kaydı yok.</p>
-        {% endif %}
-    </div>
-</section>
-
-<section class="module-section">
-    <div class="form-card">
-        <h3>Finance Kaydı Ekle</h3>
-
-        <form action="/add-finance" method="POST" class="module-form">
-            <label for="finance_date">Tarih</label>
-            <input id="finance_date" type="date" name="finance_date" required>
-
-            <label for="finance_usd">USD/TRY</label>
-            <input id="finance_usd" type="number" step="0.01" name="finance_usd" placeholder="Örn: 38.45" required>
-
-            <label for="finance_eur">EUR/TRY</label>
-            <input id="finance_eur" type="number" step="0.01" name="finance_eur" placeholder="Örn: 42.10" required>
-
-            <label for="finance_gold">Gram Altın</label>
-            <input id="finance_gold" type="number" step="0.01" name="finance_gold" placeholder="Örn: 2450.75" required>
-
-            <label for="finance_interest">En İyi Faiz (%)</label>
-            <input id="finance_interest" type="number" step="0.01" name="finance_interest" placeholder="Örn: 52.00" required>
-
-            <label for="finance_comment">Kısa Yorum</label>
-            <textarea id="finance_comment" name="finance_comment" rows="4" placeholder="Bugünkü genel piyasa yorumu"></textarea>
-
-            <button type="submit">Finance Kaydet</button>
-        </form>
-    </div>
-
-    <div class="list-card">
-        <h3>Son Finance Kayıtları</h3>
-
-        {% if finance_logs %}
-            <div class="module-list">
-                {% for log in finance_logs %}
-                    <div class="module-item">
-                        <div class="item-top">
-                            <strong>{{ log['date'] }}</strong>
-                            <span>%{{ log['interest'] }}</span>
-                        </div>
-                        <p>USD: {{ log['usd'] }} | EUR: {{ log['eur'] }} | Altın: {{ log['gold'] }}</p>
-                        {% if log['comment'] %}
-                            <p class="notes">{{ log['comment'] }}</p>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <p>Henüz finance kaydı yok.</p>
-        {% endif %}
-    </div>
-</section>
-
-{% if chart_labels and chart_values %}
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    const labels = {{ chart_labels | safe }};
-    const values = {{ chart_values | safe }};
-    const canvas = document.getElementById("energyChart");
-
-    if (!canvas || !labels.length || !values.length) {
-        return;
-    }
-
-    new Chart(canvas, {
-        type: "line",
-        data: {
-            labels: labels,
-            datasets: [{
-                label: "Enerji",
-                data: values,
-                borderColor: "#111827",
-                backgroundColor: "rgba(17, 24, 39, 0.10)",
-                borderWidth: 2,
-                tension: 0.35,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            scales: {
-                y: {
-                    min: 1,
-                    max: 3,
-                    ticks: {
-                        stepSize: 1,
-                        callback: function(value) {
-                            if (value === 1) return "Düşük";
-                            if (value === 2) return "Orta";
-                            if (value === 3) return "Yüksek";
-                            return value;
-                        }
-                    }
-                }
-            }
-        }
-    });
-});
-</script>
-{% endif %}
 {% endblock %}
