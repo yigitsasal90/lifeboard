@@ -1,175 +1,62 @@
 body {
     margin: 0;
-    font-family: Arial, sans-serif;
-    background: #f3f4f6;
-    color: #111827;
+    font-family: Arial;
+    background: #f1f5f9;
 }
 
 .topbar {
-    background: #111827;
+    background: #0f172a;
     color: white;
-    padding: 24px 20px;
-}
-
-.topbar h1 {
-    margin: 0;
-    font-size: 32px;
-    font-weight: 700;
-}
-
-.topbar p {
-    margin: 8px 0 0;
-    font-size: 16px;
-    color: #d1d5db;
+    padding: 20px;
 }
 
 .container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 24px 20px 40px;
+    max-width: 1100px;
+    margin: auto;
 }
 
-.container h2 {
-    margin-top: 0;
-    margin-bottom: 20px;
-    font-size: 22px;
-}
-
-.card-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-    margin-bottom: 28px;
+.cards {
+    display: flex;
+    gap: 15px;
+    margin: 20px 0;
 }
 
 .card {
     background: white;
-    padding: 22px;
+    padding: 20px;
     border-radius: 14px;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    flex: 1;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
 
-.card h3 {
-    margin-top: 0;
-    margin-bottom: 14px;
-    font-size: 18px;
-}
-
-.card p {
-    margin: 8px 0;
-    line-height: 1.5;
-}
-
-.chart-card {
-    background: white;
-    padding: 22px;
-    border-radius: 14px;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
-    margin-bottom: 24px;
-}
-
-.chart-card h3 {
-    margin-top: 0;
-    margin-bottom: 16px;
-}
-
-.module-section {
-    display: grid;
-    grid-template-columns: 1.3fr 1fr;
-    gap: 20px;
-    margin-bottom: 24px;
-}
-
-.form-card,
-.list-card {
-    background: white;
-    padding: 22px;
-    border-radius: 14px;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
-}
-
-.form-card h3,
-.list-card h3 {
-    margin-top: 0;
-    margin-bottom: 18px;
-    font-size: 20px;
-}
-
-.module-form {
+.grid {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
 }
 
-.module-form label {
-    font-weight: 600;
-    margin-top: 4px;
-}
-
-.module-form input,
-.module-form select,
-.module-form textarea {
+.left {
     width: 100%;
-    box-sizing: border-box;
-    padding: 12px 14px;
-    border: 1px solid #d1d5db;
-    border-radius: 10px;
-    font-size: 14px;
+}
+
+.form-card {
     background: white;
-    color: #111827;
+    padding: 20px;
+    border-radius: 14px;
+    margin-bottom: 20px;
 }
 
-.module-form textarea {
-    resize: vertical;
-    min-height: 110px;
+input, select, textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
 }
 
-.module-form button {
-    margin-top: 12px;
-    padding: 13px 16px;
+button {
+    width: 100%;
+    padding: 12px;
+    background: #0f172a;
+    color: white;
     border: none;
     border-radius: 10px;
-    background: #111827;
-    color: white;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.module-form button:hover {
-    opacity: 0.94;
-}
-
-.module-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.module-item {
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 14px;
-    background: #f9fafb;
-}
-
-.item-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
-}
-
-.notes {
-    color: #4b5563;
-    margin-top: 8px;
-    line-height: 1.5;
-}
-
-@media (max-width: 1000px) {
-    .card-grid,
-    .module-section {
-        grid-template-columns: 1fr;
-    }
 }
