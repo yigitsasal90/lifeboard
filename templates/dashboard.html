@@ -1,15 +1,34 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2 class="welcome">Hoş geldin 👋</h2>
+<section class="hero">
+    <p class="mini-title">Hoş geldin</p>
+    <h2>Bugünün Özeti</h2>
+    <p class="hero-sub">Günlük alışkanlıklarına hızlı bir bakış.</p>
+</section>
 
-<div class="cards">
+<section class="summary-banner">
+    <div class="summary-icon">🔥</div>
+    <div class="summary-main">
+        <h3>{{ streak }} gündür devam ediyorsun</h3>
+        <p>Harika gidiyorsun, ritmi koru.</p>
+    </div>
+    <div class="summary-pill">{{ streak }}</div>
+</section>
+
+<section class="quote-card">
+    <span>💬</span>
+    <p>{{ routine_comment }}</p>
+</section>
+
+<section class="cards">
     <div class="card">
         <h3>Routine</h3>
         {% if last_routine %}
-            <p><strong>Enerji:</strong> {{ last_routine.energy }}</p>
-            <p><strong>Aktivite:</strong> {{ last_routine.activity }}</p>
-            <p><strong>Kas Ağrısı:</strong> {{ last_routine.pain }}</p>
+            <p><strong>Durum:</strong> {{ last_routine['mood'] }}</p>
+            <p><strong>Enerji:</strong> {{ last_routine['energy'] }}</p>
+            <p><strong>Aktivite:</strong> {{ last_routine['activity'] }}</p>
+            <p><strong>Kas Ağrısı:</strong> {{ last_routine['pain'] }}</p>
         {% else %}
             <p>Kayıt yok</p>
         {% endif %}
@@ -18,9 +37,10 @@
     <div class="card">
         <h3>Winnie</h3>
         {% if last_winnie %}
-            <p><strong>İştah:</strong> {{ last_winnie.appetite }}</p>
-            <p><strong>Enerji:</strong> {{ last_winnie.energy }}</p>
-            <p><strong>Tuvalet:</strong> {{ last_winnie.toilet }}</p>
+            <p><strong>İştah:</strong> {{ last_winnie['appetite'] }}</p>
+            <p><strong>Enerji:</strong> {{ last_winnie['energy'] }}</p>
+            <p><strong>Tuvalet:</strong> {{ last_winnie['toilet'] }}</p>
+            <p><strong>Kaşıma:</strong> {{ last_winnie['itch'] }}</p>
         {% else %}
             <p>Kayıt yok</p>
         {% endif %}
@@ -33,35 +53,72 @@
             <p><strong>EUR:</strong> {{ finance.eur }}</p>
             <p><strong>GBP:</strong> {{ finance.gbp }}</p>
             <p><strong>Gram:</strong> {{ finance.gram }}</p>
-            <p><strong>Çeyrek:</strong> {{ finance.ceyrek }}</p>
-            <p><strong>Tam:</strong> {{ finance.tam }}</p>
             <p><strong>Faiz:</strong> %{{ finance.faiz }}</p>
         {% else %}
-            <p>Kayıt yok</p>
+            <p>Veri alınamadı</p>
         {% endif %}
     </div>
-</div>
+</section>
 
-<div class="form-card">
+<section class="info-grid">
+    <div class="highlight-card">
+        <div class="ring-score">
+            <div class="ring-inner">
+                <strong>{{ 40 + (streak * 5) }}</strong>
+                <span>/100</span>
+            </div>
+        </div>
+
+        <div class="highlight-text">
+            <h3>Günlük skorun</h3>
+            <p>{{ 40 + (streak * 5) }}/100</p>
+            <strong>İyi ama geliştirilebilir.</strong>
+        </div>
+    </div>
+
+    <div class="highlight-card secondary">
+        <h3>{{ vaccine_info.title }}</h3>
+        <p>{{ vaccine_info.text }}</p>
+    </div>
+</section>
+
+<section class="chart-card">
+    <h3>Enerji Grafiği</h3>
+    {% if chart_labels and chart_values %}
+        <canvas id="energyChart" height="110"></canvas>
+    {% else %}
+        <p>Grafik için henüz routine kaydı yok.</p>
+    {% endif %}
+</section>
+
+<section class="form-card">
     <h3>Routine Kaydı</h3>
+
     <form method="POST" action="/add_routine">
-        <input type="date" name="date" required>
+        <input type="hidden" name="date" value="{{ today_value }}">
 
-        <select name="energy" required>
-            <option value="">Enerji seç</option>
-            <option value="Düşük">Düşük</option>
-            <option value="Orta">Orta</option>
-            <option value="Yüksek">Yüksek</option>
-        </select>
+        <label>Bugün nasıldı?</label>
+        <div class="choice-grid three">
+            <label class="choice-pill"><input type="radio" name="mood" value="İyiydi" required><span>İyiydi</span></label>
+            <label class="choice-pill"><input type="radio" name="mood" value="Normaldi" required><span>Normaldi</span></label>
+            <label class="choice-pill"><input type="radio" name="mood" value="Yorucuydu" required><span>Yorucuydu</span></label>
+        </div>
 
-        <select name="pain" required>
-            <option value="">Kas ağrısı seç</option>
-            <option value="Yok">Yok</option>
-            <option value="Hafif">Hafif</option>
-            <option value="Orta">Orta</option>
-            <option value="Belirgin">Belirgin</option>
-        </select>
+        <label>Enerji</label>
+        <div class="choice-grid three">
+            <label class="choice-pill"><input type="radio" name="energy" value="Düşük" required><span>Düşük</span></label>
+            <label class="choice-pill"><input type="radio" name="energy" value="Orta" required><span>Orta</span></label>
+            <label class="choice-pill"><input type="radio" name="energy" value="Yüksek" required><span>Yüksek</span></label>
+        </div>
 
+        <label>Kas ağrısı</label>
+        <div class="choice-grid three">
+            <label class="choice-pill"><input type="radio" name="pain" value="Yok" required><span>Yok</span></label>
+            <label class="choice-pill"><input type="radio" name="pain" value="Hafif" required><span>Hafif</span></label>
+            <label class="choice-pill"><input type="radio" name="pain" value="Belirgin" required><span>Belirgin</span></label>
+        </div>
+
+        <label>Aktivite</label>
         <select name="activity" required>
             <option value="">Aktivite seç</option>
             <option value="Padel">🎾 Padel</option>
@@ -73,52 +130,61 @@
             <option value="Dinlenme">🛌 Dinlenme</option>
         </select>
 
+        <label>Kısa not</label>
         <textarea name="note" placeholder="Bugün nasıldı?"></textarea>
 
         <button type="submit">Kaydet</button>
     </form>
-</div>
+</section>
 
-<div class="two-col">
+<section class="two-col">
     <div class="form-card">
         <h3>Winnie Kaydı</h3>
+
         <form method="POST" action="/add_winnie">
-            <input type="date" name="date" required>
+            <input type="hidden" name="date" value="{{ today_value }}">
 
-            <select name="appetite" required>
-                <option value="">İştah seç</option>
-                <option value="Kötü">Kötü</option>
-                <option value="Orta">Orta</option>
-                <option value="İyi">İyi</option>
-            </select>
+            <label>İştah</label>
+            <div class="choice-grid three">
+                <label class="choice-pill"><input type="radio" name="appetite" value="Düşük" required><span>Düşük</span></label>
+                <label class="choice-pill"><input type="radio" name="appetite" value="Orta" required><span>Orta</span></label>
+                <label class="choice-pill"><input type="radio" name="appetite" value="İyi" required><span>İyi</span></label>
+            </div>
 
-            <select name="energy" required>
-                <option value="">Enerji seç</option>
-                <option value="Düşük">Düşük</option>
-                <option value="Normal">Normal</option>
-                <option value="Yüksek">Yüksek</option>
-            </select>
+            <label>Enerji</label>
+            <div class="choice-grid three">
+                <label class="choice-pill"><input type="radio" name="energy" value="Düşük" required><span>Düşük</span></label>
+                <label class="choice-pill"><input type="radio" name="energy" value="Normal" required><span>Normal</span></label>
+                <label class="choice-pill"><input type="radio" name="energy" value="Yüksek" required><span>Yüksek</span></label>
+            </div>
 
-            <select name="toilet" required>
-                <option value="">Tuvalet seç</option>
-                <option value="Normal">Normal</option>
-                <option value="Problemli">Problemli</option>
-            </select>
+            <label>Tuvalet</label>
+            <div class="choice-grid two">
+                <label class="choice-pill"><input type="radio" name="toilet" value="Normal" required><span>Normal</span></label>
+                <label class="choice-pill"><input type="radio" name="toilet" value="Problemli" required><span>Problemli</span></label>
+            </div>
 
-            <select name="itch" required>
-                <option value="">Kaşıma seç</option>
-                <option value="Yok">Yok</option>
-                <option value="Var">Var</option>
-            </select>
+            <label>Kaşıma</label>
+            <div class="choice-grid two">
+                <label class="choice-pill"><input type="radio" name="itch" value="Yok" required><span>Yok</span></label>
+                <label class="choice-pill"><input type="radio" name="itch" value="Var" required><span>Var</span></label>
+            </div>
 
+            <label>Kısa not</label>
             <textarea name="note" placeholder="Winnie bugün nasıldı?"></textarea>
 
             <button type="submit">Kaydet</button>
         </form>
+
+        <div class="inline-comment">
+            <h4>Winnie Özeti</h4>
+            <p>{{ winnie_comment }}</p>
+        </div>
     </div>
 
     <div class="form-card">
         <h3>Aşı Takvimi</h3>
+
         <form method="POST" action="/add_vaccine">
             <input type="date" name="date" required>
             <input type="text" name="name" placeholder="Aşı adı" required>
@@ -126,11 +192,11 @@
         </form>
 
         <div class="list-box">
-            {% if vaccines %}
-                {% for v in vaccines %}
+            {% if vaccine_rows %}
+                {% for v in vaccine_rows %}
                     <div class="list-item">
-                        <strong>{{ v.date }}</strong>
-                        <span>{{ v.name }}</span>
+                        <strong>{{ v['vaccine_date'] }}</strong>
+                        <span>{{ v['vaccine_name'] }}</span>
                     </div>
                 {% endfor %}
             {% else %}
@@ -138,9 +204,9 @@
             {% endif %}
         </div>
     </div>
-</div>
+</section>
 
-<div class="form-card finance-box">
+<section class="finance-box form-card">
     <h3>Canlı Finance Özeti</h3>
 
     {% if finance %}
@@ -149,33 +215,27 @@
                 <span>Dolar</span>
                 <strong>{{ finance.usd }}</strong>
             </div>
-
             <div class="mini-finance-card">
                 <span>Euro</span>
                 <strong>{{ finance.eur }}</strong>
             </div>
-
             <div class="mini-finance-card">
                 <span>Sterlin</span>
                 <strong>{{ finance.gbp }}</strong>
             </div>
-
             <div class="mini-finance-card">
                 <span>Gram Altın</span>
                 <strong>{{ finance.gram }}</strong>
             </div>
-
             <div class="mini-finance-card">
                 <span>Çeyrek Altın</span>
                 <strong>{{ finance.ceyrek }}</strong>
             </div>
-
             <div class="mini-finance-card">
                 <span>Tam Altın</span>
                 <strong>{{ finance.tam }}</strong>
             </div>
-
-            <div class="mini-finance-card">
+            <div class="mini-finance-card accent">
                 <span>Akbank Faiz</span>
                 <strong>%{{ finance.faiz }}</strong>
             </div>
@@ -183,6 +243,77 @@
     {% else %}
         <p>Finance verisi şu anda alınamadı.</p>
     {% endif %}
-</div>
+</section>
 
+{% if chart_labels and chart_values %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const labels = {{ chart_labels | safe }};
+    const values = {{ chart_values | safe }};
+    const canvas = document.getElementById("energyChart");
+
+    if (!canvas || !labels.length || !values.length) return;
+
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    const gridColor = isDark ? "rgba(255,255,255,0.10)" : "rgba(15,23,42,0.10)";
+    const tickColor = isDark ? "#e5e7eb" : "#334155";
+
+    new Chart(canvas, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Enerji",
+                data: values,
+                borderColor: "#f59e0b",
+                backgroundColor: "rgba(245, 158, 11, 0.18)",
+                borderWidth: 3,
+                tension: 0.35,
+                fill: true,
+                pointRadius: 4,
+                pointBackgroundColor: "#f59e0b"
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: tickColor
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        color: tickColor
+                    },
+                    grid: {
+                        color: gridColor
+                    }
+                },
+                y: {
+                    min: 1,
+                    max: 3,
+                    ticks: {
+                        stepSize: 1,
+                        color: tickColor,
+                        callback: function(value) {
+                            if (value === 1) return "Düşük";
+                            if (value === 2) return "Orta";
+                            if (value === 3) return "Yüksek";
+                            return value;
+                        }
+                    },
+                    grid: {
+                        color: gridColor
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endif %}
 {% endblock %}
