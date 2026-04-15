@@ -2,7 +2,13 @@
 
 {% block content %}
 <section class="hero">
-    <p class="mini-title">Hoş geldin</p>
+    <div class="hero-topline">
+        <p class="mini-title">Hoş geldin</p>
+        {% if vaccine_info.badge %}
+            <span class="alert-badge {{ vaccine_info.level }}">{{ vaccine_info.badge }}</span>
+        {% endif %}
+    </div>
+
     <h2>Bugünün Özeti</h2>
     <p class="hero-sub">Günlük alışkanlıklarına hızlı bir bakış.</p>
 </section>
@@ -23,7 +29,11 @@
 
 <section class="cards">
     <div class="card">
-        <h3>Routine</h3>
+        <div class="card-head">
+            <h3>Routine</h3>
+            <span class="trend-pill {{ routine_trend.class }}">{{ routine_trend.label }}</span>
+        </div>
+
         {% if last_routine %}
             <p><strong>Durum:</strong> {{ last_routine['mood'] }}</p>
             <p><strong>Enerji:</strong> {{ last_routine['energy'] }}</p>
@@ -35,7 +45,11 @@
     </div>
 
     <div class="card">
-        <h3>Winnie</h3>
+        <div class="card-head">
+            <h3>Winnie</h3>
+            <span class="trend-pill {{ winnie_trend.class }}">{{ winnie_trend.label }}</span>
+        </div>
+
         {% if last_winnie %}
             <p><strong>İştah:</strong> {{ last_winnie['appetite'] }}</p>
             <p><strong>Enerji:</strong> {{ last_winnie['energy'] }}</p>
@@ -47,7 +61,11 @@
     </div>
 
     <div class="card">
-        <h3>Finance</h3>
+        <div class="card-head">
+            <h3>Finance</h3>
+            <span class="trend-pill mid">Canlı</span>
+        </div>
+
         {% if finance %}
             <p><strong>USD:</strong> {{ finance.usd }}</p>
             <p><strong>EUR:</strong> {{ finance.eur }}</p>
@@ -76,14 +94,18 @@
         </div>
     </div>
 
-    <div class="highlight-card secondary">
+    <div class="highlight-card secondary {{ vaccine_info.level }}">
         <h3>{{ vaccine_info.title }}</h3>
         <p>{{ vaccine_info.text }}</p>
     </div>
 </section>
 
 <section class="chart-card">
-    <h3>Enerji Grafiği</h3>
+    <div class="section-head">
+        <h3>Enerji Grafiği</h3>
+        <span class="section-sub">Son 30 kayıt</span>
+    </div>
+
     {% if chart_labels and chart_values %}
         <canvas id="energyChart" height="110"></canvas>
     {% else %}
@@ -135,6 +157,35 @@
 
         <button type="submit">Kaydet</button>
     </form>
+</section>
+
+<section class="history-card">
+    <div class="section-head">
+        <h3>Routine Geçmişi</h3>
+        <div class="filter-pills" data-filter-group="routine">
+            <button type="button" class="filter-pill active" data-days="7">7 gün</button>
+            <button type="button" class="filter-pill" data-days="30">30 gün</button>
+            <button type="button" class="filter-pill" data-days="all">Tüm zamanlar</button>
+        </div>
+    </div>
+
+    <div class="mini-history-grid" id="routineHistory">
+        {% if routine_rows %}
+            {% for row in routine_rows %}
+                {% set row_trend = 'good' if row['mood'] == 'İyiydi' else 'bad' if row['mood'] == 'Yorucuydu' or row['pain'] == 'Belirgin' else 'mid' %}
+                <div class="mini-history-card" data-date="{{ row['log_date'] }}">
+                    <div class="mini-history-top">
+                        <strong>{{ row['log_date'] }}</strong>
+                        <span class="trend-pill {{ row_trend }}">{{ row['mood'] }}</span>
+                    </div>
+                    <p>{{ row['activity'] }}</p>
+                    <small>Enerji: {{ row['energy'] }} · Ağrı: {{ row['pain'] }}</small>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>Henüz routine kaydı yok.</p>
+        {% endif %}
+    </div>
 </section>
 
 <section class="two-col">
@@ -206,8 +257,40 @@
     </div>
 </section>
 
+<section class="history-card">
+    <div class="section-head">
+        <h3>Winnie Geçmişi</h3>
+        <div class="filter-pills" data-filter-group="winnie">
+            <button type="button" class="filter-pill active" data-days="7">7 gün</button>
+            <button type="button" class="filter-pill" data-days="30">30 gün</button>
+            <button type="button" class="filter-pill" data-days="all">Tüm zamanlar</button>
+        </div>
+    </div>
+
+    <div class="mini-history-grid" id="winnieHistory">
+        {% if winnie_rows %}
+            {% for row in winnie_rows %}
+                {% set row_trend = 'good' if row['appetite'] == 'İyi' and row['toilet'] == 'Normal' and row['itch'] == 'Yok' else 'bad' if row['appetite'] == 'Düşük' or row['toilet'] == 'Problemli' else 'mid' %}
+                <div class="mini-history-card" data-date="{{ row['log_date'] }}">
+                    <div class="mini-history-top">
+                        <strong>{{ row['log_date'] }}</strong>
+                        <span class="trend-pill {{ row_trend }}">{{ row['energy'] }}</span>
+                    </div>
+                    <p>İştah: {{ row['appetite'] }}</p>
+                    <small>Tuvalet: {{ row['toilet'] }} · Kaşıma: {{ row['itch'] }}</small>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>Henüz Winnie kaydı yok.</p>
+        {% endif %}
+    </div>
+</section>
+
 <section class="finance-box form-card">
-    <h3>Canlı Finance Özeti</h3>
+    <div class="section-head">
+        <h3>Canlı Finance Özeti</h3>
+        <span class="section-sub">Akbank faiz referansı dahil</span>
+    </div>
 
     {% if finance %}
         <div class="finance-grid">
@@ -252,67 +335,100 @@ document.addEventListener("DOMContentLoaded", function () {
     const values = {{ chart_values | safe }};
     const canvas = document.getElementById("energyChart");
 
-    if (!canvas || !labels.length || !values.length) return;
+    if (canvas && labels.length && values.length) {
+        const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+        const gridColor = isDark ? "rgba(255,255,255,0.10)" : "rgba(15,23,42,0.10)";
+        const tickColor = isDark ? "#f3f4f6" : "#334155";
 
-    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-    const gridColor = isDark ? "rgba(255,255,255,0.10)" : "rgba(15,23,42,0.10)";
-    const tickColor = isDark ? "#e5e7eb" : "#334155";
-
-    new Chart(canvas, {
-        type: "line",
-        data: {
-            labels: labels,
-            datasets: [{
-                label: "Enerji",
-                data: values,
-                borderColor: "#f59e0b",
-                backgroundColor: "rgba(245, 158, 11, 0.18)",
-                borderWidth: 3,
-                tension: 0.35,
-                fill: true,
-                pointRadius: 4,
-                pointBackgroundColor: "#f59e0b"
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    labels: {
-                        color: tickColor
-                    }
-                }
+        new Chart(canvas, {
+            type: "line",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Enerji",
+                    data: values,
+                    borderColor: "#f59e0b",
+                    backgroundColor: "rgba(245, 158, 11, 0.18)",
+                    borderWidth: 3,
+                    tension: 0.35,
+                    fill: true,
+                    pointRadius: 4,
+                    pointBackgroundColor: "#f59e0b"
+                }]
             },
-            scales: {
-                x: {
-                    ticks: {
-                        color: tickColor
-                    },
-                    grid: {
-                        color: gridColor
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: tickColor
+                        }
                     }
                 },
-                y: {
-                    min: 1,
-                    max: 3,
-                    ticks: {
-                        stepSize: 1,
-                        color: tickColor,
-                        callback: function(value) {
-                            if (value === 1) return "Düşük";
-                            if (value === 2) return "Orta";
-                            if (value === 3) return "Yüksek";
-                            return value;
-                        }
+                scales: {
+                    x: {
+                        ticks: { color: tickColor },
+                        grid: { color: gridColor }
                     },
-                    grid: {
-                        color: gridColor
+                    y: {
+                        min: 1,
+                        max: 3,
+                        ticks: {
+                            stepSize: 1,
+                            color: tickColor,
+                            callback: function(value) {
+                                if (value === 1) return "Düşük";
+                                if (value === 2) return "Orta";
+                                if (value === 3) return "Yüksek";
+                                return value;
+                            }
+                        },
+                        grid: { color: gridColor }
                     }
                 }
             }
-        }
+        });
+    }
+
+    function applyFilter(containerId, days) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const cards = container.querySelectorAll(".mini-history-card");
+        const today = new Date();
+
+        cards.forEach(card => {
+            if (days === "all") {
+                card.style.display = "block";
+                return;
+            }
+
+            const cardDate = new Date(card.dataset.date);
+            const diff = Math.floor((today - cardDate) / (1000 * 60 * 60 * 24));
+
+            card.style.display = diff <= Number(days) ? "block" : "none";
+        });
+    }
+
+    document.querySelectorAll('[data-filter-group="routine"] .filter-pill').forEach(btn => {
+        btn.addEventListener("click", function () {
+            document.querySelectorAll('[data-filter-group="routine"] .filter-pill').forEach(b => b.classList.remove("active"));
+            this.classList.add("active");
+            applyFilter("routineHistory", this.dataset.days);
+        });
     });
+
+    document.querySelectorAll('[data-filter-group="winnie"] .filter-pill').forEach(btn => {
+        btn.addEventListener("click", function () {
+            document.querySelectorAll('[data-filter-group="winnie"] .filter-pill').forEach(b => b.classList.remove("active"));
+            this.classList.add("active");
+            applyFilter("winnieHistory", this.dataset.days);
+        });
+    });
+
+    applyFilter("routineHistory", 7);
+    applyFilter("winnieHistory", 7);
 });
 </script>
 {% endif %}
