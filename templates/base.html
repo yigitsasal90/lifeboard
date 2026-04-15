@@ -4,18 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LifeBoard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=11">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=12">
 </head>
 <body>
     <header class="topbar">
         <div class="brand-wrap">
             <div>
                 <h1>LifeBoard</h1>
-                <p>by Yigit</p>
+                <p>by Yigit · Routine + Winnie + Finance</p>
             </div>
 
             <button id="themeToggle" class="theme-toggle" type="button" aria-label="Tema değiştir">
-                ☀️
+                <span class="theme-icon sun">☀️</span>
+                <span class="theme-icon moon">🌙</span>
             </button>
         </div>
     </header>
@@ -32,7 +33,6 @@
 
         function applyTheme(theme) {
             root.setAttribute("data-theme", theme);
-            toggle.textContent = theme === "dark" ? "☀️" : "🌙";
         }
 
         applyTheme(savedTheme);
