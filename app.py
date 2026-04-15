@@ -71,7 +71,7 @@ def energy_to_number(value):
     }.get(value, 0)
 
 
-def compute_streak(routine_rows):
+def calculate_streak(routine_rows):
     if not routine_rows:
         return 0
 
@@ -91,6 +91,76 @@ def compute_streak(routine_rows):
             break
 
     return streak
+
+
+def calculate_daily_score(routine_rows, winnie_rows, vaccine_info):
+    score = 40
+
+    if routine_rows:
+        latest = routine_rows[0]
+
+        mood = latest["mood"]
+        energy = latest["energy"]
+        pain = latest["pain"]
+        activity = latest["activity"]
+
+        if mood == "İyiydi":
+            score += 15
+        elif mood == "Normaldi":
+            score += 8
+        else:
+            score -= 8
+
+        if energy == "Yüksek":
+            score += 18
+        elif energy == "Orta":
+            score += 10
+        else:
+            score -= 6
+
+        if pain == "Yok":
+            score += 12
+        elif pain == "Hafif":
+            score += 5
+        else:
+            score -= 8
+
+        if activity in ("Padel", "Futbol", "Fonksiyonel Antrenman"):
+            score += 8
+        elif activity in ("Yürüyüş", "E-Scooter"):
+            score += 4
+
+    if winnie_rows:
+        latest_w = winnie_rows[0]
+
+        if latest_w["appetite"] == "İyi":
+            score += 5
+        elif latest_w["appetite"] == "Düşük":
+            score -= 4
+
+        if latest_w["toilet"] == "Problemli":
+            score -= 5
+
+        if latest_w["itch"] == "Var":
+            score -= 3
+
+    if vaccine_info["level"] == "warning":
+        score -= 3
+    elif vaccine_info["level"] == "danger":
+        score -= 7
+
+    score = max(0, min(score, 100))
+
+    if score >= 80:
+        text = "Harika gidiyorsun, devam et!"
+    elif score >= 60:
+        text = "İyi ama geliştirilebilir."
+    elif score >= 45:
+        text = "Fena değil, biraz toparlama iyi gelir."
+    else:
+        text = "Düşüş var, dinlenme ve düzen önemli."
+
+    return score, text
 
 
 def routine_trend(row):
@@ -233,6 +303,7 @@ def get_finance_data():
         eur_try = usd_try / data["rates"]["EUR"]
         gbp_try = usd_try / data["rates"]["GBP"]
 
+        # Geçici türetilmiş altın hesapları
         gram = round(usd_try * 0.55, 2)
         ceyrek = round(gram * 1.75, 2)
         tam = round(ceyrek * 4, 2)
@@ -281,11 +352,9 @@ def index():
     chart_values = [energy_to_number(row["energy"]) for row in chart_source]
 
     finance = get_finance_data()
-
-    streak = compute_streak(routine_rows)
-    routine_comment = build_routine_comment(routine_rows)
-    winnie_comment = build_winnie_comment(winnie_rows)
+    streak = calculate_streak(routine_rows)
     vaccine_info = vaccine_status(vaccine_rows)
+    score, score_text = calculate_daily_score(routine_rows, winnie_rows, vaccine_info)
 
     return render_template(
         "dashboard.html",
@@ -296,8 +365,10 @@ def index():
         vaccine_rows=vaccine_rows,
         finance=finance,
         streak=streak,
-        routine_comment=routine_comment,
-        winnie_comment=winnie_comment,
+        score=score,
+        score_text=score_text,
+        routine_comment=build_routine_comment(routine_rows),
+        winnie_comment=build_winnie_comment(winnie_rows),
         vaccine_info=vaccine_info,
         routine_trend=routine_trend(last_routine),
         winnie_trend=winnie_trend(last_winnie),
