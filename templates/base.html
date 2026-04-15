@@ -1,15 +1,23 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LifeBoard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=10">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=11">
 </head>
 <body>
     <header class="topbar">
-        <h1>LifeBoard</h1>
-        <p>Routine + Boo + Finance</p>
+        <div class="brand-wrap">
+            <div>
+                <h1>LifeBoard</h1>
+                <p>by Yigit</p>
+            </div>
+
+            <button id="themeToggle" class="theme-toggle" type="button" aria-label="Tema değiştir">
+                ☀️
+            </button>
+        </div>
     </header>
 
     <main class="container">
@@ -17,5 +25,24 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const root = document.documentElement;
+        const toggle = document.getElementById("themeToggle");
+        const savedTheme = localStorage.getItem("lifeboard-theme") || "dark";
+
+        function applyTheme(theme) {
+            root.setAttribute("data-theme", theme);
+            toggle.textContent = theme === "dark" ? "☀️" : "🌙";
+        }
+
+        applyTheme(savedTheme);
+
+        toggle.addEventListener("click", function () {
+            const current = root.getAttribute("data-theme");
+            const next = current === "dark" ? "light" : "dark";
+            localStorage.setItem("lifeboard-theme", next);
+            applyTheme(next);
+        });
+    </script>
 </body>
 </html>
