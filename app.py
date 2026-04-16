@@ -9,6 +9,7 @@ from datetime import datetime, date
 app = Flask(__name__)
 
 DB_PATH = "lifeboard.db"
+FX_CACHE_MINUTES = 30  # free Alpha Vantage için güvenli aralık
 
 
 # -----------------------------
@@ -73,7 +74,6 @@ def init_db():
         )
     """)
 
-    # eski "mood" verilerinden "flow" alanına geçiş
     if not column_exists(conn, "routine_logs", "flow"):
         conn.execute("ALTER TABLE routine_logs ADD COLUMN flow TEXT")
 
@@ -346,13 +346,20 @@ def http_get_text(url, timeout=15):
     return response.text
 
 
-def fetch_alpha_fx(from_currency, to_currency, api_key):
+def fetch_alpha_fx_single(from_currency, to_currency, api_key):
     url = (
         "https://www.alphavantage.co/query"
         f"?function=CURRENCY_EXCHANGE_RATE&from_currency={from_currency}"
         f"&to_currency={to_currency}&apikey={api_key}"
     )
     data = http_get_json(url)
+
+    if "Note" in data:
+        raise ValueError(data["Note"])
+
+    if "Information" in data:
+        raise ValueError(data["Information"])
+
     quote = data.get("Realtime Currency Exchange Rate", {})
     value = quote.get("5. Exchange Rate")
     refreshed = quote.get("6. Last Refreshed")
@@ -376,7 +383,7 @@ def fetch_stooq_xauusd():
 
     match = extract_first_match(html, [
         r"XAUUSD[\s\S]{0,1600}?(\d{3,5}\.\d{1,2})\s+[+\-]\d+\.\d+\s+\(([+\-]?\d+\.\d+)%\)",
-        r"Złoto\s*(\d{3,5}\.\d{1,2})([+\-]\d+\.\d+)%"
+        r"Złoto\s*(\d{3,5}\.\d{1,2})([+\-]?\d+\.\d+)%"
     ])
 
     if not match:
@@ -387,7 +394,7 @@ def fetch_stooq_xauusd():
     prev = price / (1 + pct / 100) if pct != 0 else price
 
     return {
-        "price": round(price, 2),     # ons başına USD
+        "price": round(price, 2),
         "prev": round(prev, 2),
         "pct": round(pct, 2)
     }
@@ -396,10 +403,9 @@ def fetch_stooq_xauusd():
 def fetch_stooq_brent():
     html = http_get_text("https://stooq.com/q/?s=cb.f", timeout=20)
 
-    # önce daha net pattern
     match = extract_first_match(html, [
         r"Last\s*([0-9]+\.[0-9]+)\s*\$/bbl[\s\S]{0,250}?1 Day:\s*([0-9]+\.[0-9]+)([+\-]\d+\.\d+)%",
-        r"CB\.F\s*\(([+\-]?\d+\.\d+)%\)[\s\S]{0,800}?Last\s*([0-9]+\.[0-9]+)",
+        r"CB\.F\s*\(([+\-]?\d+\.\d+)%\)[\s\S]{0,800}?Last\s*([0-9]+\.[0-9]+)"
     ])
 
     if not match:
@@ -452,17 +458,17 @@ def save_finance_snapshot(payload):
     conn.close()
 
 
-def should_save_new_snapshot(last_snapshot):
+def is_snapshot_fresh(last_snapshot, minutes=FX_CACHE_MINUTES):
     if not last_snapshot:
-        return True
+        return False
 
     try:
         last_time = datetime.fromisoformat(last_snapshot["fetched_at"])
     except ValueError:
-        return True
+        return False
 
     diff = datetime.now() - last_time
-    return diff.total_seconds() >= 55
+    return diff.total_seconds() < (minutes * 60)
 
 
 def calc_change(value, prev):
@@ -512,7 +518,6 @@ def build_finance_cards(current_values, previous_values=None):
     for key in ["usd", "eur", "gbp", "gram", "ceyrek", "tam", "brent", "faiz"]:
         value = current_values.get(key)
         prev = previous_values.get(key) if previous_values else None
-
         change = calc_change(value, prev)
 
         cards.append({
@@ -534,16 +539,19 @@ def fetch_live_finance():
         return None, "ALPHA_VANTAGE_API_KEY eksik"
 
     try:
-        usd_try, fx_time = fetch_alpha_fx("USD", "TRY", alpha_key)
-        eur_try, _ = fetch_alpha_fx("EUR", "TRY", alpha_key)
-        gbp_try, _ = fetch_alpha_fx("GBP", "TRY", alpha_key)
+        usd_try, fx_time = fetch_alpha_fx_single("USD", "TRY", alpha_key)
 
-        xau = fetch_stooq_xauusd()     # ons altın USD
-        brent = fetch_stooq_brent()    # Brent petrol $/bbl
+        # EURTRY ve GBPTRY'yi USD bazlı kurdan türet
+        eur_usd, _ = fetch_alpha_fx_single("EUR", "USD", alpha_key)
+        gbp_usd, _ = fetch_alpha_fx_single("GBP", "USD", alpha_key)
+
+        eur_try = eur_usd * usd_try
+        gbp_try = gbp_usd * usd_try
+
+        xau = fetch_stooq_xauusd()
+        brent = fetch_stooq_brent()
 
         gram_try = (xau["price"] / 31.1034768) * usd_try
-
-        # Türkiye kuyumcu piyasasına daha yakın yaklaşık çarpanlar
         ceyrek_try = gram_try * 1.64
         tam_try = ceyrek_try * 4
 
@@ -568,6 +576,34 @@ def fetch_live_finance():
     except Exception as e:
         print("FINANCE ERROR:", e)
         return None, str(e)
+
+
+def resolve_finance():
+    last_snapshot = get_last_finance_snapshot()
+
+    # cache varsa ve tazeyse direkt onu kullan
+    if is_snapshot_fresh(last_snapshot):
+        payload = last_snapshot["payload"]
+        prev_values = None
+        finance_cards = build_finance_cards(payload["values"], prev_values)
+        return finance_cards, f"{last_snapshot['fetched_at']} (cache)", None
+
+    # değilse canlı veri çekmeyi dene
+    live_finance, finance_error = fetch_live_finance()
+
+    if live_finance:
+        prev_values = last_snapshot["payload"]["values"] if last_snapshot else None
+        finance_cards = build_finance_cards(live_finance["values"], prev_values)
+        save_finance_snapshot(live_finance)
+        return finance_cards, live_finance["updated_at"], None
+
+    # canlı veri başarısızsa, son başarılı snapshot varsa onu göster
+    if last_snapshot:
+        payload = last_snapshot["payload"]
+        finance_cards = build_finance_cards(payload["values"], None)
+        return finance_cards, f"{last_snapshot['fetched_at']} (son başarılı veri)", finance_error
+
+    return [], None, finance_error
 
 
 # -----------------------------
@@ -606,23 +642,7 @@ def index():
     streak = calculate_streak(routine_rows)
     score, score_text = calculate_daily_score(routine_rows, winnie_rows, vaccine_info)
 
-    live_finance, finance_error = fetch_live_finance()
-    last_snapshot = get_last_finance_snapshot()
-
-    finance_cards = []
-    finance_updated_at = None
-
-    if live_finance:
-        previous_values = last_snapshot["payload"]["values"] if last_snapshot else None
-        finance_cards = build_finance_cards(live_finance["values"], previous_values)
-        finance_updated_at = live_finance["updated_at"]
-
-        if should_save_new_snapshot(last_snapshot):
-            save_finance_snapshot(live_finance)
-
-    elif last_snapshot:
-        finance_cards = build_finance_cards(last_snapshot["payload"]["values"], None)
-        finance_updated_at = f"{last_snapshot['fetched_at']} (son başarılı veri)"
+    finance_cards, finance_updated_at, finance_error = resolve_finance()
 
     return render_template(
         "dashboard.html",
@@ -639,7 +659,7 @@ def index():
         score_text=score_text,
         routine_comment=build_routine_comment(routine_rows),
         winnie_comment=build_winnie_comment(winnie_rows),
-        vaccine_info=vaccine_info,
+        vaccine_info=vaccine_status(vaccine_rows),
         routine_trend=routine_trend(last_routine),
         winnie_trend=winnie_trend(last_winnie),
         chart_labels=json.dumps(chart_labels, ensure_ascii=False),
