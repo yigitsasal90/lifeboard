@@ -35,9 +35,9 @@
         </div>
 
         {% if last_routine %}
-            <p><strong>Durum:</strong> {{ last_routine['mood'] }}</p>
+            <p><strong>Akış:</strong> {{ last_routine['flow'] }}</p>
             <p><strong>Enerji:</strong> {{ last_routine['energy'] }}</p>
-            <p><strong>Aktivite:</strong> {{ last_routine['activity'] }}</p>
+            <p><strong>Ana aktivite:</strong> {{ last_routine['activity'] }}</p>
             <p><strong>Kas Ağrısı:</strong> {{ last_routine['pain'] }}</p>
         {% else %}
             <p>Kayıt yok</p>
@@ -66,12 +66,15 @@
             <span class="trend-pill mid">Canlı</span>
         </div>
 
-        {% if finance %}
-            <p><strong>USD:</strong> {{ finance.usd }}</p>
-            <p><strong>EUR:</strong> {{ finance.eur }}</p>
-            <p><strong>GBP:</strong> {{ finance.gbp }}</p>
-            <p><strong>Gram:</strong> {{ finance.gram }}</p>
-            <p><strong>Faiz:</strong> %{{ finance.faiz }}</p>
+        {% if finance_cards %}
+            {% for item in finance_cards[:5] %}
+                <p>
+                    <strong>{{ item.label }}:</strong> {{ item.display_value }}
+                    <span class="mini-inline-change {{ item.change_class }}">
+                        {{ item.arrow }} {{ item.change_text }}
+                    </span>
+                </p>
+            {% endfor %}
         {% else %}
             <p>Veri alınamadı</p>
         {% endif %}
@@ -79,7 +82,7 @@
 </section>
 
 <section class="info-grid">
-    <div class="highlight-card">
+    <div class="highlight-card" style="--score-angle: {{ score * 3.6 }}deg;">
         <div class="ring-score">
             <div class="ring-inner">
                 <strong>{{ score }}</strong>
@@ -121,11 +124,11 @@
     <form method="POST" action="/add_routine">
         <input type="hidden" name="date" value="{{ today_value }}">
 
-        <label>Bugün nasıldı?</label>
+        <label>Günün akışı</label>
         <div class="choice-grid three">
-            <label class="choice-pill"><input type="radio" name="mood" value="İyiydi" required><span>İyiydi</span></label>
-            <label class="choice-pill"><input type="radio" name="mood" value="Normaldi" required><span>Normaldi</span></label>
-            <label class="choice-pill"><input type="radio" name="mood" value="Yorucuydu" required><span>Yorucuydu</span></label>
+            <label class="choice-pill"><input type="radio" name="flow" value="Rahattı" required><span>Rahattı</span></label>
+            <label class="choice-pill"><input type="radio" name="flow" value="Dengeliydi" required><span>Dengeliydi</span></label>
+            <label class="choice-pill"><input type="radio" name="flow" value="Zorladı" required><span>Zorladı</span></label>
         </div>
 
         <label>Enerji</label>
@@ -142,9 +145,9 @@
             <label class="choice-pill"><input type="radio" name="pain" value="Belirgin" required><span>Belirgin</span></label>
         </div>
 
-        <label>Aktivite</label>
+        <label>Ana aktivite</label>
         <select name="activity" required>
-            <option value="">Aktivite seç</option>
+            <option value="">Ana aktivite seç</option>
             <option value="Padel">🎾 Padel</option>
             <option value="Futbol">⚽ Futbol</option>
             <option value="Fonksiyonel Antrenman">🏋️ Fonksiyonel Antrenman</option>
@@ -174,11 +177,11 @@
     <div class="mini-history-grid" id="routineHistory">
         {% if routine_rows %}
             {% for row in routine_rows %}
-                {% set row_trend = 'good' if row['mood'] == 'İyiydi' else 'bad' if row['mood'] == 'Yorucuydu' or row['pain'] == 'Belirgin' else 'mid' %}
+                {% set row_trend = 'good' if row['flow'] == 'Rahattı' else 'bad' if row['flow'] == 'Zorladı' or row['pain'] == 'Belirgin' else 'mid' %}
                 <div class="mini-history-card" data-date="{{ row['log_date'] }}">
                     <div class="mini-history-top">
                         <strong>{{ row['log_date'] }}</strong>
-                        <span class="trend-pill {{ row_trend }}">{{ row['mood'] }}</span>
+                        <span class="trend-pill {{ row_trend }}">{{ row['flow'] }}</span>
                     </div>
                     <p>{{ row['activity'] }}</p>
                     <small>Enerji: {{ row['energy'] }} · Ağrı: {{ row['pain'] }}</small>
@@ -289,44 +292,34 @@
 </section>
 
 <section class="finance-box form-card">
-    <div class="section-head">
-        <h3>Canlı Finance Özeti</h3>
-        <span class="section-sub">Akbank faiz referansı dahil</span>
+    <div class="section-head finance-head">
+        <div>
+            <h3>Canlı Finance Özeti</h3>
+            {% if finance_updated_at %}
+                <span class="section-sub">Son güncelleme: {{ finance_updated_at }}</span>
+            {% endif %}
+        </div>
+        <span class="section-sub">60 sn’de bir yenilenir</span>
     </div>
 
-    {% if finance %}
+    {% if finance_cards %}
         <div class="finance-grid">
-            <div class="mini-finance-card">
-                <span>Dolar</span>
-                <strong>{{ finance.usd }}</strong>
-            </div>
-            <div class="mini-finance-card">
-                <span>Euro</span>
-                <strong>{{ finance.eur }}</strong>
-            </div>
-            <div class="mini-finance-card">
-                <span>Sterlin</span>
-                <strong>{{ finance.gbp }}</strong>
-            </div>
-            <div class="mini-finance-card">
-                <span>Gram Altın</span>
-                <strong>{{ finance.gram }}</strong>
-            </div>
-            <div class="mini-finance-card">
-                <span>Çeyrek Altın</span>
-                <strong>{{ finance.ceyrek }}</strong>
-            </div>
-            <div class="mini-finance-card">
-                <span>Tam Altın</span>
-                <strong>{{ finance.tam }}</strong>
-            </div>
-            <div class="mini-finance-card accent">
-                <span>Akbank Faiz</span>
-                <strong>%{{ finance.faiz }}</strong>
-            </div>
+            {% for item in finance_cards %}
+                <div class="mini-finance-card {% if item.key == 'faiz' %}accent{% endif %}">
+                    <span>{{ item.label }}</span>
+                    <strong>{{ item.display_value }}</strong>
+                    <div class="finance-change {{ item.change_class }}">
+                        <span class="arrow">{{ item.arrow }}</span>
+                        <span>{{ item.change_text }}</span>
+                    </div>
+                </div>
+            {% endfor %}
         </div>
     {% else %}
         <p>Finance verisi şu anda alınamadı.</p>
+        {% if finance_error %}
+            <p class="finance-error">Detay: {{ finance_error }}</p>
+        {% endif %}
     {% endif %}
 </section>
 
