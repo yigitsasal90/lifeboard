@@ -2,9 +2,8 @@ from flask import Flask, render_template, request, redirect
 import sqlite3
 import os
 import json
+import re
 import requests
-import csv
-import io
 from datetime import datetime, date
 
 app = Flask(__name__)
@@ -12,10 +11,18 @@ app = Flask(__name__)
 DB_PATH = "lifeboard.db"
 
 
+# -----------------------------
+# DB
+# -----------------------------
 def get_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def column_exists(conn, table_name, column_name):
+    cols = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return any(col["name"] == column_name for col in cols)
 
 
 def init_db():
@@ -26,7 +33,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS routine_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             log_date TEXT NOT NULL,
-            flow TEXT NOT NULL,
+            flow TEXT,
+            mood TEXT,
             energy TEXT NOT NULL,
             pain TEXT NOT NULL,
             activity TEXT NOT NULL,
@@ -65,10 +73,29 @@ def init_db():
         )
     """)
 
+    # eski "mood" verilerinden "flow" alanına geçiş
+    if not column_exists(conn, "routine_logs", "flow"):
+        conn.execute("ALTER TABLE routine_logs ADD COLUMN flow TEXT")
+
+    if column_exists(conn, "routine_logs", "mood"):
+        conn.execute("""
+            UPDATE routine_logs
+            SET flow = CASE
+                WHEN mood = 'İyiydi' THEN 'Rahattı'
+                WHEN mood = 'Normaldi' THEN 'Dengeliydi'
+                WHEN mood = 'Yorucuydu' THEN 'Zorladı'
+                ELSE COALESCE(flow, 'Dengeliydi')
+            END
+            WHERE flow IS NULL OR flow = ''
+        """)
+
     conn.commit()
     conn.close()
 
 
+# -----------------------------
+# HELPERS
+# -----------------------------
 def today_str():
     return date.today().isoformat()
 
@@ -299,10 +326,24 @@ def calculate_daily_score(routine_rows, winnie_rows, vaccine_info):
     return score, text
 
 
-def http_get_json(url, headers=None, timeout=15):
-    response = requests.get(url, headers=headers or {}, timeout=timeout)
+# -----------------------------
+# FINANCE
+# -----------------------------
+HTTP_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; LifeBoard/1.0)"
+}
+
+
+def http_get_json(url, timeout=15):
+    response = requests.get(url, headers=HTTP_HEADERS, timeout=timeout)
     response.raise_for_status()
     return response.json()
+
+
+def http_get_text(url, timeout=15):
+    response = requests.get(url, headers=HTTP_HEADERS, timeout=timeout)
+    response.raise_for_status()
+    return response.text
 
 
 def fetch_alpha_fx(from_currency, to_currency, api_key):
@@ -315,69 +356,68 @@ def fetch_alpha_fx(from_currency, to_currency, api_key):
     quote = data.get("Realtime Currency Exchange Rate", {})
     value = quote.get("5. Exchange Rate")
     refreshed = quote.get("6. Last Refreshed")
+
     if value is None:
         raise ValueError(f"FX data missing for {from_currency}/{to_currency}")
+
     return float(value), refreshed
 
 
-def fetch_brent(api_key):
-    url = (
-        "https://www.alphavantage.co/query"
-        f"?function=BRENT&interval=daily&datatype=csv&apikey={api_key}"
-    )
-    response = requests.get(url, timeout=20)
-    response.raise_for_status()
-
-    reader = csv.DictReader(io.StringIO(response.text))
-    rows = list(reader)
-
-    if not rows:
-        raise ValueError("BRENT CSV boş döndü")
-
-    latest = rows[0]
-
-    # Alpha Vantage commodity CSV'lerinde genelde "value" kolonu olur
-    possible_value_keys = ["value", "Value", "close", "Close"]
-    value = None
-    for key in possible_value_keys:
-        if key in latest and latest[key]:
-            value = float(latest[key])
-            break
-
-    if value is None:
-        raise ValueError("BRENT değeri çözümlenemedi")
-
-    timestamp = latest.get("timestamp") or latest.get("date") or datetime.now().isoformat()
-    return value, timestamp
+def extract_first_match(text, patterns):
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+        if match:
+            return match
+    return None
 
 
-def fetch_gold_prices_try(metals_api_key, usd_try):
-    url = f"https://metals-api.com/api/latest?access_key={metals_api_key}&base=USD&symbols=XAU"
-    data = http_get_json(url)
+def fetch_stooq_xauusd():
+    html = http_get_text("https://stooq.com/q/?s=xauusd", timeout=20)
 
-    rates = data.get("rates", {})
-    xau_value = rates.get("XAU")
+    match = extract_first_match(html, [
+        r"XAUUSD[\s\S]{0,1600}?(\d{3,5}\.\d{1,2})\s+[+\-]\d+\.\d+\s+\(([+\-]?\d+\.\d+)%\)",
+        r"Złoto\s*(\d{3,5}\.\d{1,2})([+\-]\d+\.\d+)%"
+    ])
 
-    if xau_value is None:
-        raise ValueError("XAU değeri bulunamadı")
+    if not match:
+        raise ValueError("XAUUSD değeri çözümlenemedi")
 
-    xau_usd_per_ounce = float(xau_value)
-
-    # Bazı metal API'lerinde yön ters olabiliyor; küçük sayı dönerse çevir
-    if xau_usd_per_ounce < 100:
-        xau_usd_per_ounce = 1 / xau_usd_per_ounce
-
-    gram_try = (xau_usd_per_ounce * usd_try) / 31.1034768
-
-    # Türkiye piyasasına daha yakın yaklaşık katsayılar
-    ceyrek_try = gram_try * 1.62
-    tam_try = ceyrek_try * 4
+    price = float(match.group(1))
+    pct = float(match.group(2)) if match.lastindex and match.lastindex >= 2 else 0.0
+    prev = price / (1 + pct / 100) if pct != 0 else price
 
     return {
-        "gram": round(gram_try, 2),
-        "ceyrek": round(ceyrek_try, 2),
-        "tam": round(tam_try, 2),
-        "timestamp": data.get("date") or datetime.now().isoformat()
+        "price": round(price, 2),     # ons başına USD
+        "prev": round(prev, 2),
+        "pct": round(pct, 2)
+    }
+
+
+def fetch_stooq_brent():
+    html = http_get_text("https://stooq.com/q/?s=cb.f", timeout=20)
+
+    # önce daha net pattern
+    match = extract_first_match(html, [
+        r"Last\s*([0-9]+\.[0-9]+)\s*\$/bbl[\s\S]{0,250}?1 Day:\s*([0-9]+\.[0-9]+)([+\-]\d+\.\d+)%",
+        r"CB\.F\s*\(([+\-]?\d+\.\d+)%\)[\s\S]{0,800}?Last\s*([0-9]+\.[0-9]+)",
+    ])
+
+    if not match:
+        raise ValueError("Brent değeri çözümlenemedi")
+
+    if len(match.groups()) == 3:
+        last = float(match.group(1))
+        prev = float(match.group(2))
+        pct = float(match.group(3))
+    else:
+        pct = float(match.group(1))
+        last = float(match.group(2))
+        prev = last / (1 + pct / 100) if pct != 0 else last
+
+    return {
+        "price": round(last, 2),
+        "prev": round(prev, 2),
+        "pct": round(pct, 2)
     }
 
 
@@ -425,6 +465,37 @@ def should_save_new_snapshot(last_snapshot):
     return diff.total_seconds() >= 55
 
 
+def calc_change(value, prev):
+    if prev in (None, 0):
+        return {
+            "arrow": "•",
+            "change_text": "İlk veri",
+            "change_class": "flat"
+        }
+
+    diff = value - prev
+    pct = (diff / prev) * 100
+
+    if diff > 0:
+        return {
+            "arrow": "▲",
+            "change_text": f"+{pct:.2f}%",
+            "change_class": "up"
+        }
+    if diff < 0:
+        return {
+            "arrow": "▼",
+            "change_text": f"{pct:.2f}%",
+            "change_class": "down"
+        }
+
+    return {
+        "arrow": "•",
+        "change_text": "0.00%",
+        "change_class": "flat"
+    }
+
+
 def build_finance_cards(current_values, previous_values=None):
     labels = {
         "usd": "Dolar",
@@ -438,40 +509,20 @@ def build_finance_cards(current_values, previous_values=None):
     }
 
     cards = []
-
     for key in ["usd", "eur", "gbp", "gram", "ceyrek", "tam", "brent", "faiz"]:
         value = current_values.get(key)
         prev = previous_values.get(key) if previous_values else None
 
-        arrow = "•"
-        change_text = "İlk veri"
-        change_class = "flat"
-
-        if prev is not None and prev != 0:
-            diff = value - prev
-            pct = (diff / prev) * 100
-
-            if diff > 0:
-                arrow = "▲"
-                change_class = "up"
-            elif diff < 0:
-                arrow = "▼"
-                change_class = "down"
-            else:
-                arrow = "•"
-                change_class = "flat"
-
-            sign = "+" if pct > 0 else ""
-            change_text = f"{sign}{pct:.2f}%"
+        change = calc_change(value, prev)
 
         cards.append({
             "key": key,
             "label": labels[key],
             "value": value,
             "display_value": f"%{value:.2f}" if key == "faiz" else f"{value:.2f}",
-            "arrow": arrow,
-            "change_text": change_text,
-            "change_class": change_class
+            "arrow": change["arrow"],
+            "change_text": change["change_text"],
+            "change_class": change["change_class"]
         })
 
     return cards
@@ -479,30 +530,35 @@ def build_finance_cards(current_values, previous_values=None):
 
 def fetch_live_finance():
     alpha_key = os.environ.get("ALPHA_VANTAGE_API_KEY", "").strip()
-    metals_key = os.environ.get("METALS_API_KEY", "").strip()
-
-    if not alpha_key or not metals_key:
-        return None, "API key eksik"
+    if not alpha_key:
+        return None, "ALPHA_VANTAGE_API_KEY eksik"
 
     try:
         usd_try, fx_time = fetch_alpha_fx("USD", "TRY", alpha_key)
         eur_try, _ = fetch_alpha_fx("EUR", "TRY", alpha_key)
         gbp_try, _ = fetch_alpha_fx("GBP", "TRY", alpha_key)
-        brent, brent_time = fetch_brent(alpha_key)
-        gold = fetch_gold_prices_try(metals_key, usd_try)
+
+        xau = fetch_stooq_xauusd()     # ons altın USD
+        brent = fetch_stooq_brent()    # Brent petrol $/bbl
+
+        gram_try = (xau["price"] / 31.1034768) * usd_try
+
+        # Türkiye kuyumcu piyasasına daha yakın yaklaşık çarpanlar
+        ceyrek_try = gram_try * 1.64
+        tam_try = ceyrek_try * 4
 
         values = {
             "usd": round(usd_try, 2),
             "eur": round(eur_try, 2),
             "gbp": round(gbp_try, 2),
-            "gram": gold["gram"],
-            "ceyrek": gold["ceyrek"],
-            "tam": gold["tam"],
-            "brent": round(brent, 2),
+            "gram": round(gram_try, 2),
+            "ceyrek": round(ceyrek_try, 2),
+            "tam": round(tam_try, 2),
+            "brent": round(brent["price"], 2),
             "faiz": 42.00
         }
 
-        updated_at = fx_time or brent_time or gold["timestamp"] or datetime.now().isoformat()
+        updated_at = fx_time or datetime.now().isoformat(timespec="seconds")
 
         return {
             "values": values,
@@ -514,6 +570,9 @@ def fetch_live_finance():
         return None, str(e)
 
 
+# -----------------------------
+# ROUTES
+# -----------------------------
 @app.route("/")
 def index():
     conn = get_conn()
@@ -560,11 +619,10 @@ def index():
 
         if should_save_new_snapshot(last_snapshot):
             save_finance_snapshot(live_finance)
+
     elif last_snapshot:
         finance_cards = build_finance_cards(last_snapshot["payload"]["values"], None)
         finance_updated_at = f"{last_snapshot['fetched_at']} (son başarılı veri)"
-    else:
-        finance_cards = []
 
     return render_template(
         "dashboard.html",
