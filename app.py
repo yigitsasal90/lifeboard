@@ -2,8 +2,10 @@ from flask import Flask, render_template, request, redirect
 import sqlite3
 import os
 import json
-from datetime import datetime, date
 import requests
+import csv
+import io
+from datetime import datetime, date
 
 app = Flask(__name__)
 
@@ -24,7 +26,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS routine_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             log_date TEXT NOT NULL,
-            mood TEXT NOT NULL,
+            flow TEXT NOT NULL,
             energy TEXT NOT NULL,
             pain TEXT NOT NULL,
             activity TEXT NOT NULL,
@@ -52,6 +54,14 @@ def init_db():
             vaccine_date TEXT NOT NULL,
             vaccine_name TEXT NOT NULL,
             created_at TEXT NOT NULL
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS finance_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fetched_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL
         )
     """)
 
@@ -93,84 +103,14 @@ def calculate_streak(routine_rows):
     return streak
 
 
-def calculate_daily_score(routine_rows, winnie_rows, vaccine_info):
-    score = 40
-
-    if routine_rows:
-        latest = routine_rows[0]
-
-        mood = latest["mood"]
-        energy = latest["energy"]
-        pain = latest["pain"]
-        activity = latest["activity"]
-
-        if mood == "İyiydi":
-            score += 15
-        elif mood == "Normaldi":
-            score += 8
-        else:
-            score -= 8
-
-        if energy == "Yüksek":
-            score += 18
-        elif energy == "Orta":
-            score += 10
-        else:
-            score -= 6
-
-        if pain == "Yok":
-            score += 12
-        elif pain == "Hafif":
-            score += 5
-        else:
-            score -= 8
-
-        if activity in ("Padel", "Futbol", "Fonksiyonel Antrenman"):
-            score += 8
-        elif activity in ("Yürüyüş", "E-Scooter"):
-            score += 4
-
-    if winnie_rows:
-        latest_w = winnie_rows[0]
-
-        if latest_w["appetite"] == "İyi":
-            score += 5
-        elif latest_w["appetite"] == "Düşük":
-            score -= 4
-
-        if latest_w["toilet"] == "Problemli":
-            score -= 5
-
-        if latest_w["itch"] == "Var":
-            score -= 3
-
-    if vaccine_info["level"] == "warning":
-        score -= 3
-    elif vaccine_info["level"] == "danger":
-        score -= 7
-
-    score = max(0, min(score, 100))
-
-    if score >= 80:
-        text = "Harika gidiyorsun, devam et!"
-    elif score >= 60:
-        text = "İyi ama geliştirilebilir."
-    elif score >= 45:
-        text = "Fena değil, biraz toparlama iyi gelir."
-    else:
-        text = "Düşüş var, dinlenme ve düzen önemli."
-
-    return score, text
-
-
 def routine_trend(row):
     if not row:
         return {"label": "Veri yok", "class": "neutral"}
 
-    if row["mood"] == "İyiydi" and row["energy"] == "Yüksek":
+    if row["flow"] == "Rahattı" and row["energy"] == "Yüksek":
         return {"label": "Formda", "class": "good"}
 
-    if row["mood"] == "Yorucuydu" or row["pain"] == "Belirgin":
+    if row["flow"] == "Zorladı" or row["pain"] == "Belirgin":
         return {"label": "Yüksek yük", "class": "bad"}
 
     return {"label": "Dengeli", "class": "mid"}
@@ -196,14 +136,14 @@ def build_routine_comment(rows):
     latest = rows[0]
     latest3 = rows[:3]
 
-    hard_days = sum(1 for r in latest3 if r["mood"] == "Yorucuydu" or r["pain"] == "Belirgin")
+    hard_days = sum(1 for r in latest3 if r["flow"] == "Zorladı" or r["pain"] == "Belirgin")
     high_energy = sum(1 for r in latest3 if r["energy"] == "Yüksek")
     low_energy = sum(1 for r in latest3 if r["energy"] == "Düşük")
 
     if hard_days >= 2:
         return "Son günlerde yük artmış görünüyor. Bir toparlanma günü eklemek iyi olabilir."
 
-    if high_energy >= 2 and latest["mood"] == "İyiydi":
+    if high_energy >= 2 and latest["flow"] == "Rahattı":
         return "Ritmin iyi. Son kayıtlar formunun yukarı gittiğini gösteriyor."
 
     if low_energy >= 2:
@@ -294,32 +234,284 @@ def vaccine_status(vaccine_rows):
     }
 
 
-def get_finance_data():
+def calculate_daily_score(routine_rows, winnie_rows, vaccine_info):
+    score = 40
+
+    if routine_rows:
+        latest = routine_rows[0]
+
+        if latest["flow"] == "Rahattı":
+            score += 15
+        elif latest["flow"] == "Dengeliydi":
+            score += 8
+        else:
+            score -= 8
+
+        if latest["energy"] == "Yüksek":
+            score += 18
+        elif latest["energy"] == "Orta":
+            score += 10
+        else:
+            score -= 6
+
+        if latest["pain"] == "Yok":
+            score += 12
+        elif latest["pain"] == "Hafif":
+            score += 5
+        else:
+            score -= 8
+
+        if latest["activity"] in ("Padel", "Futbol", "Fonksiyonel Antrenman"):
+            score += 8
+        elif latest["activity"] in ("Yürüyüş", "E-Scooter"):
+            score += 4
+
+    if winnie_rows:
+        latest_w = winnie_rows[0]
+
+        if latest_w["appetite"] == "İyi":
+            score += 5
+        elif latest_w["appetite"] == "Düşük":
+            score -= 4
+
+        if latest_w["toilet"] == "Problemli":
+            score -= 5
+
+        if latest_w["itch"] == "Var":
+            score -= 3
+
+    if vaccine_info["level"] == "warning":
+        score -= 3
+    elif vaccine_info["level"] == "danger":
+        score -= 7
+
+    score = max(0, min(score, 100))
+
+    if score >= 80:
+        text = "Harika gidiyorsun, devam et!"
+    elif score >= 60:
+        text = "İyi ama geliştirilebilir."
+    elif score >= 45:
+        text = "Fena değil, biraz toparlama iyi gelir."
+    else:
+        text = "Düşüş var, dinlenme ve düzen önemli."
+
+    return score, text
+
+
+def http_get_json(url, headers=None, timeout=15):
+    response = requests.get(url, headers=headers or {}, timeout=timeout)
+    response.raise_for_status()
+    return response.json()
+
+
+def fetch_alpha_fx(from_currency, to_currency, api_key):
+    url = (
+        "https://www.alphavantage.co/query"
+        f"?function=CURRENCY_EXCHANGE_RATE&from_currency={from_currency}"
+        f"&to_currency={to_currency}&apikey={api_key}"
+    )
+    data = http_get_json(url)
+    quote = data.get("Realtime Currency Exchange Rate", {})
+    value = quote.get("5. Exchange Rate")
+    refreshed = quote.get("6. Last Refreshed")
+    if value is None:
+        raise ValueError(f"FX data missing for {from_currency}/{to_currency}")
+    return float(value), refreshed
+
+
+def fetch_brent(api_key):
+    url = (
+        "https://www.alphavantage.co/query"
+        f"?function=BRENT&interval=daily&datatype=csv&apikey={api_key}"
+    )
+    response = requests.get(url, timeout=20)
+    response.raise_for_status()
+
+    reader = csv.DictReader(io.StringIO(response.text))
+    rows = list(reader)
+
+    if not rows:
+        raise ValueError("BRENT CSV boş döndü")
+
+    latest = rows[0]
+
+    # Alpha Vantage commodity CSV'lerinde genelde "value" kolonu olur
+    possible_value_keys = ["value", "Value", "close", "Close"]
+    value = None
+    for key in possible_value_keys:
+        if key in latest and latest[key]:
+            value = float(latest[key])
+            break
+
+    if value is None:
+        raise ValueError("BRENT değeri çözümlenemedi")
+
+    timestamp = latest.get("timestamp") or latest.get("date") or datetime.now().isoformat()
+    return value, timestamp
+
+
+def fetch_gold_prices_try(metals_api_key, usd_try):
+    url = f"https://metals-api.com/api/latest?access_key={metals_api_key}&base=USD&symbols=XAU"
+    data = http_get_json(url)
+
+    rates = data.get("rates", {})
+    xau_value = rates.get("XAU")
+
+    if xau_value is None:
+        raise ValueError("XAU değeri bulunamadı")
+
+    xau_usd_per_ounce = float(xau_value)
+
+    # Bazı metal API'lerinde yön ters olabiliyor; küçük sayı dönerse çevir
+    if xau_usd_per_ounce < 100:
+        xau_usd_per_ounce = 1 / xau_usd_per_ounce
+
+    gram_try = (xau_usd_per_ounce * usd_try) / 31.1034768
+
+    # Türkiye piyasasına daha yakın yaklaşık katsayılar
+    ceyrek_try = gram_try * 1.62
+    tam_try = ceyrek_try * 4
+
+    return {
+        "gram": round(gram_try, 2),
+        "ceyrek": round(ceyrek_try, 2),
+        "tam": round(tam_try, 2),
+        "timestamp": data.get("date") or datetime.now().isoformat()
+    }
+
+
+def get_last_finance_snapshot():
+    conn = get_conn()
+    row = conn.execute("""
+        SELECT * FROM finance_snapshots
+        ORDER BY id DESC
+        LIMIT 1
+    """).fetchone()
+    conn.close()
+
+    if not row:
+        return None
+
+    return {
+        "fetched_at": row["fetched_at"],
+        "payload": json.loads(row["payload_json"])
+    }
+
+
+def save_finance_snapshot(payload):
+    conn = get_conn()
+    conn.execute("""
+        INSERT INTO finance_snapshots (fetched_at, payload_json)
+        VALUES (?, ?)
+    """, (
+        datetime.now().isoformat(timespec="seconds"),
+        json.dumps(payload, ensure_ascii=False)
+    ))
+    conn.commit()
+    conn.close()
+
+
+def should_save_new_snapshot(last_snapshot):
+    if not last_snapshot:
+        return True
+
     try:
-        res = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=10)
-        data = res.json()
+        last_time = datetime.fromisoformat(last_snapshot["fetched_at"])
+    except ValueError:
+        return True
 
-        usd_try = data["rates"]["TRY"]
-        eur_try = usd_try / data["rates"]["EUR"]
-        gbp_try = usd_try / data["rates"]["GBP"]
+    diff = datetime.now() - last_time
+    return diff.total_seconds() >= 55
 
-        # Geçici türetilmiş altın hesapları
-        gram = round(usd_try * 0.55, 2)
-        ceyrek = round(gram * 1.75, 2)
-        tam = round(ceyrek * 4, 2)
 
-        return {
+def build_finance_cards(current_values, previous_values=None):
+    labels = {
+        "usd": "Dolar",
+        "eur": "Euro",
+        "gbp": "Sterlin",
+        "gram": "Gram Altın",
+        "ceyrek": "Çeyrek Altın",
+        "tam": "Tam Altın",
+        "brent": "Brent Petrol",
+        "faiz": "Akbank Faiz"
+    }
+
+    cards = []
+
+    for key in ["usd", "eur", "gbp", "gram", "ceyrek", "tam", "brent", "faiz"]:
+        value = current_values.get(key)
+        prev = previous_values.get(key) if previous_values else None
+
+        arrow = "•"
+        change_text = "İlk veri"
+        change_class = "flat"
+
+        if prev is not None and prev != 0:
+            diff = value - prev
+            pct = (diff / prev) * 100
+
+            if diff > 0:
+                arrow = "▲"
+                change_class = "up"
+            elif diff < 0:
+                arrow = "▼"
+                change_class = "down"
+            else:
+                arrow = "•"
+                change_class = "flat"
+
+            sign = "+" if pct > 0 else ""
+            change_text = f"{sign}{pct:.2f}%"
+
+        cards.append({
+            "key": key,
+            "label": labels[key],
+            "value": value,
+            "display_value": f"%{value:.2f}" if key == "faiz" else f"{value:.2f}",
+            "arrow": arrow,
+            "change_text": change_text,
+            "change_class": change_class
+        })
+
+    return cards
+
+
+def fetch_live_finance():
+    alpha_key = os.environ.get("ALPHA_VANTAGE_API_KEY", "").strip()
+    metals_key = os.environ.get("METALS_API_KEY", "").strip()
+
+    if not alpha_key or not metals_key:
+        return None, "API key eksik"
+
+    try:
+        usd_try, fx_time = fetch_alpha_fx("USD", "TRY", alpha_key)
+        eur_try, _ = fetch_alpha_fx("EUR", "TRY", alpha_key)
+        gbp_try, _ = fetch_alpha_fx("GBP", "TRY", alpha_key)
+        brent, brent_time = fetch_brent(alpha_key)
+        gold = fetch_gold_prices_try(metals_key, usd_try)
+
+        values = {
             "usd": round(usd_try, 2),
             "eur": round(eur_try, 2),
             "gbp": round(gbp_try, 2),
-            "gram": gram,
-            "ceyrek": ceyrek,
-            "tam": tam,
-            "faiz": 42
+            "gram": gold["gram"],
+            "ceyrek": gold["ceyrek"],
+            "tam": gold["tam"],
+            "brent": round(brent, 2),
+            "faiz": 42.00
         }
+
+        updated_at = fx_time or brent_time or gold["timestamp"] or datetime.now().isoformat()
+
+        return {
+            "values": values,
+            "updated_at": updated_at
+        }, None
+
     except Exception as e:
         print("FINANCE ERROR:", e)
-        return None
+        return None, str(e)
 
 
 @app.route("/")
@@ -351,10 +543,28 @@ def index():
     chart_labels = [row["log_date"] for row in chart_source]
     chart_values = [energy_to_number(row["energy"]) for row in chart_source]
 
-    finance = get_finance_data()
-    streak = calculate_streak(routine_rows)
     vaccine_info = vaccine_status(vaccine_rows)
+    streak = calculate_streak(routine_rows)
     score, score_text = calculate_daily_score(routine_rows, winnie_rows, vaccine_info)
+
+    live_finance, finance_error = fetch_live_finance()
+    last_snapshot = get_last_finance_snapshot()
+
+    finance_cards = []
+    finance_updated_at = None
+
+    if live_finance:
+        previous_values = last_snapshot["payload"]["values"] if last_snapshot else None
+        finance_cards = build_finance_cards(live_finance["values"], previous_values)
+        finance_updated_at = live_finance["updated_at"]
+
+        if should_save_new_snapshot(last_snapshot):
+            save_finance_snapshot(live_finance)
+    elif last_snapshot:
+        finance_cards = build_finance_cards(last_snapshot["payload"]["values"], None)
+        finance_updated_at = f"{last_snapshot['fetched_at']} (son başarılı veri)"
+    else:
+        finance_cards = []
 
     return render_template(
         "dashboard.html",
@@ -363,7 +573,9 @@ def index():
         routine_rows=routine_rows,
         winnie_rows=winnie_rows,
         vaccine_rows=vaccine_rows,
-        finance=finance,
+        finance_cards=finance_cards,
+        finance_updated_at=finance_updated_at,
+        finance_error=finance_error,
         streak=streak,
         score=score,
         score_text=score_text,
@@ -381,7 +593,7 @@ def index():
 @app.route("/add_routine", methods=["POST"])
 def add_routine():
     log_date = request.form.get("date") or today_str()
-    mood = request.form.get("mood")
+    flow = request.form.get("flow")
     energy = request.form.get("energy")
     pain = request.form.get("pain")
     activity = request.form.get("activity")
@@ -389,11 +601,11 @@ def add_routine():
 
     conn = get_conn()
     conn.execute("""
-        INSERT INTO routine_logs (log_date, mood, energy, pain, activity, note, created_at)
+        INSERT INTO routine_logs (log_date, flow, energy, pain, activity, note, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (
         log_date,
-        mood,
+        flow,
         energy,
         pain,
         activity,
