@@ -24,7 +24,7 @@
 
 <section class="quote-card">
     <span>💬</span>
-    <p>{{ routine_comment }}</p>
+    <p>{{ life_summary }}</p>
 </section>
 
 <section class="cards">
@@ -62,22 +62,14 @@
 
     <div class="card">
         <div class="card-head">
-            <h3>Finance</h3>
-            <span class="trend-pill mid">Canlı</span>
+            <h3>Yaşam Özeti</h3>
+            <span class="trend-pill mid">Haftalık</span>
         </div>
 
-        {% if finance_cards %}
-            {% for item in finance_cards[:5] %}
-                <p>
-                    <strong>{{ item.label }}:</strong> {{ item.display_value }}
-                    <span class="mini-inline-change {{ item.change_class }}">
-                        {{ item.arrow }} {{ item.change_text }}
-                    </span>
-                </p>
-            {% endfor %}
-        {% else %}
-            <p>Veri alınamadı</p>
-        {% endif %}
+        <p><strong>Aktif gün:</strong> {{ weekly_stats.active_days }}</p>
+        <p><strong>Enerji ortalaması:</strong> {{ weekly_stats.energy_text }}</p>
+        <p><strong>En çok aktivite:</strong> {{ weekly_stats.top_activity }}</p>
+        <p><strong>Açık hatırlatma:</strong> {{ weekly_stats.open_reminders }}</p>
     </div>
 </section>
 
@@ -100,6 +92,32 @@
     <div class="highlight-card secondary {{ vaccine_info.level }}">
         <h3>{{ vaccine_info.title }}</h3>
         <p>{{ vaccine_info.text }}</p>
+    </div>
+</section>
+
+<section class="weekly-card">
+    <div class="section-head">
+        <h3>Haftalık İstatistik</h3>
+        <span class="section-sub">Son 7 gün görünümü</span>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-box">
+            <span>İyi gün</span>
+            <strong>{{ weekly_stats.good_days }}</strong>
+        </div>
+        <div class="stat-box">
+            <span>Dengeli gün</span>
+            <strong>{{ weekly_stats.mid_days }}</strong>
+        </div>
+        <div class="stat-box">
+            <span>Zorlayan gün</span>
+            <strong>{{ weekly_stats.hard_days }}</strong>
+        </div>
+        <div class="stat-box">
+            <span>Winnie stabil gün</span>
+            <strong>{{ weekly_stats.winnie_stable }}</strong>
+        </div>
     </div>
 </section>
 
@@ -291,36 +309,78 @@
     </div>
 </section>
 
-<section class="finance-box form-card">
-    <div class="section-head finance-head">
-        <div>
-            <h3>Canlı Finance Özeti</h3>
-            {% if finance_updated_at %}
-                <span class="section-sub">Son güncelleme: {{ finance_updated_at }}</span>
-            {% endif %}
-        </div>
-        <span class="section-sub">30 dk cache · sayfa her açıldığında son veri gösterilir</span>
+<section class="reminders-section">
+    <div class="section-head">
+        <h3>Hatırlatmalar</h3>
+        <span class="section-sub">Apple Anımsatıcılar gibi kişisel yapılacaklar alanı</span>
     </div>
 
-    {% if finance_cards %}
-        <div class="finance-grid">
-            {% for item in finance_cards %}
-                <div class="mini-finance-card {% if item.key == 'faiz' %}accent{% endif %}">
-                    <span>{{ item.label }}</span>
-                    <strong>{{ item.display_value }}</strong>
-                    <div class="finance-change {{ item.change_class }}">
-                        <span class="arrow">{{ item.arrow }}</span>
-                        <span>{{ item.change_text }}</span>
-                    </div>
-                </div>
-            {% endfor %}
+    <div class="two-col reminders-layout">
+        <div class="form-card">
+            <h3>Yeni Hatırlatma</h3>
+
+            <form method="POST" action="/add_reminder">
+                <label>Başlık</label>
+                <input type="text" name="title" placeholder="Örn: Winnie aşı kontrolü" required>
+
+                <label>Tarih</label>
+                <input type="date" name="remind_date">
+
+                <label>Öncelik</label>
+                <select name="priority" required>
+                    <option value="Düşük">Düşük</option>
+                    <option value="Normal" selected>Normal</option>
+                    <option value="Yüksek">Yüksek</option>
+                </select>
+
+                <label>Not</label>
+                <textarea name="note" placeholder="Detay yazabilirsin"></textarea>
+
+                <button type="submit">Hatırlatma Ekle</button>
+            </form>
         </div>
-    {% else %}
-        <p>Finance verisi şu anda alınamadı.</p>
-        {% if finance_error %}
-            <p class="finance-error">Detay: {{ finance_error }}</p>
-        {% endif %}
-    {% endif %}
+
+        <div class="form-card">
+            <h3>Hatırlatma Listesi</h3>
+
+            <div class="reminder-list">
+                {% if reminders %}
+                    {% for item in reminders %}
+                        <div class="reminder-item {{ item.state_class }} {% if item.is_done %}completed{% endif %}">
+                            <div class="reminder-main">
+                                <div class="reminder-title-row">
+                                    <h4>{{ item.title }}</h4>
+                                    <span class="priority-badge {{ item.priority|lower }}">{{ item.priority }}</span>
+                                </div>
+
+                                {% if item.remind_date %}
+                                    <p class="reminder-date">📅 {{ item.remind_date }}</p>
+                                {% endif %}
+
+                                {% if item.note %}
+                                    <p class="reminder-note">{{ item.note }}</p>
+                                {% endif %}
+                            </div>
+
+                            <div class="reminder-actions">
+                                <form method="POST" action="/toggle_reminder/{{ item.id }}">
+                                    <button type="submit" class="small-btn">
+                                        {% if item.is_done %}Geri Al{% else %}Tamamla{% endif %}
+                                    </button>
+                                </form>
+
+                                <form method="POST" action="/delete_reminder/{{ item.id }}">
+                                    <button type="submit" class="small-btn danger-btn">Sil</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p>Henüz hatırlatma yok.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 </section>
 
 <script>
