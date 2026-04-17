@@ -2,14 +2,11 @@ from flask import Flask, render_template, request, redirect
 import sqlite3
 import os
 import json
-import re
-import requests
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 app = Flask(__name__)
 
 DB_PATH = "lifeboard.db"
-FX_CACHE_MINUTES = 30  # free Alpha Vantage için güvenli aralık
 
 
 # -----------------------------
@@ -67,10 +64,14 @@ def init_db():
     """)
 
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS finance_snapshots (
+        CREATE TABLE IF NOT EXISTS reminders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fetched_at TEXT NOT NULL,
-            payload_json TEXT NOT NULL
+            title TEXT NOT NULL,
+            note TEXT,
+            remind_date TEXT,
+            priority TEXT NOT NULL DEFAULT 'Normal',
+            is_done INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
         )
     """)
 
@@ -98,6 +99,13 @@ def init_db():
 # -----------------------------
 def today_str():
     return date.today().isoformat()
+
+
+def safe_parse_date(value):
+    try:
+        return date.fromisoformat(value)
+    except Exception:
+        return None
 
 
 def energy_to_number(value):
@@ -219,12 +227,11 @@ def vaccine_status(vaccine_rows):
     today = date.today()
 
     for row in vaccine_rows:
-        try:
-            d = date.fromisoformat(row["vaccine_date"])
-            delta = (d - today).days
-            upcoming.append((delta, row))
-        except ValueError:
+        d = safe_parse_date(row["vaccine_date"])
+        if not d:
             continue
+        delta = (d - today).days
+        upcoming.append((delta, row))
 
     if not upcoming:
         return {
@@ -290,7 +297,7 @@ def calculate_daily_score(routine_rows, winnie_rows, vaccine_info):
 
         if latest["activity"] in ("Padel", "Futbol", "Fonksiyonel Antrenman"):
             score += 8
-        elif latest["activity"] in ("Yürüyüş", "E-Scooter"):
+        elif latest["activity"] in ("Yürüyüş", "E-Scooter", "Direnç Bandı"):
             score += 4
 
     if winnie_rows:
@@ -326,284 +333,112 @@ def calculate_daily_score(routine_rows, winnie_rows, vaccine_info):
     return score, text
 
 
-# -----------------------------
-# FINANCE
-# -----------------------------
-HTTP_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; LifeBoard/1.0)"
-}
+def get_last_7_days(rows, date_key):
+    today = date.today()
+    result = []
+    for row in rows:
+        d = safe_parse_date(row[date_key])
+        if not d:
+            continue
+        if (today - d).days <= 6:
+            result.append(row)
+    return result
 
 
-def http_get_json(url, timeout=15):
-    response = requests.get(url, headers=HTTP_HEADERS, timeout=timeout)
-    response.raise_for_status()
-    return response.json()
+def build_weekly_stats(routine_rows, winnie_rows, reminder_rows):
+    routine_7 = get_last_7_days(routine_rows, "log_date")
+    winnie_7 = get_last_7_days(winnie_rows, "log_date")
 
+    active_days = len({r["log_date"] for r in routine_7})
+    avg_energy_num = 0
+    if routine_7:
+        avg_energy_num = round(sum(energy_to_number(r["energy"]) for r in routine_7) / len(routine_7), 2)
 
-def http_get_text(url, timeout=15):
-    response = requests.get(url, headers=HTTP_HEADERS, timeout=timeout)
-    response.raise_for_status()
-    return response.text
+    energy_text = "Veri yok"
+    if avg_energy_num > 0:
+        if avg_energy_num < 1.7:
+            energy_text = "Düşük"
+        elif avg_energy_num < 2.4:
+            energy_text = "Orta"
+        else:
+            energy_text = "Yüksek"
 
+    activity_count = {}
+    for r in routine_7:
+        activity_count[r["activity"]] = activity_count.get(r["activity"], 0) + 1
 
-def fetch_alpha_fx_single(from_currency, to_currency, api_key):
-    url = (
-        "https://www.alphavantage.co/query"
-        f"?function=CURRENCY_EXCHANGE_RATE&from_currency={from_currency}"
-        f"&to_currency={to_currency}&apikey={api_key}"
+    top_activity = max(activity_count, key=activity_count.get) if activity_count else "Yok"
+
+    good_days = sum(1 for r in routine_7 if r["flow"] == "Rahattı")
+    mid_days = sum(1 for r in routine_7 if r["flow"] == "Dengeliydi")
+    hard_days = sum(1 for r in routine_7 if r["flow"] == "Zorladı")
+
+    winnie_stable = sum(
+        1 for r in winnie_7
+        if r["appetite"] == "İyi" and r["toilet"] == "Normal" and r["itch"] == "Yok"
     )
-    data = http_get_json(url)
 
-    if "Note" in data:
-        raise ValueError(data["Note"])
-
-    if "Information" in data:
-        raise ValueError(data["Information"])
-
-    quote = data.get("Realtime Currency Exchange Rate", {})
-    value = quote.get("5. Exchange Rate")
-    refreshed = quote.get("6. Last Refreshed")
-
-    if value is None:
-        raise ValueError(f"FX data missing for {from_currency}/{to_currency}")
-
-    return float(value), refreshed
-
-
-def extract_first_match(text, patterns):
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
-        if match:
-            return match
-    return None
-
-
-def fetch_stooq_xauusd():
-    html = http_get_text("https://stooq.com/q/?s=xauusd", timeout=20)
-
-    match = extract_first_match(html, [
-        r"XAUUSD[\s\S]{0,1600}?(\d{3,5}\.\d{1,2})\s+[+\-]\d+\.\d+\s+\(([+\-]?\d+\.\d+)%\)",
-        r"Złoto\s*(\d{3,5}\.\d{1,2})([+\-]?\d+\.\d+)%"
-    ])
-
-    if not match:
-        raise ValueError("XAUUSD değeri çözümlenemedi")
-
-    price = float(match.group(1))
-    pct = float(match.group(2)) if match.lastindex and match.lastindex >= 2 else 0.0
-    prev = price / (1 + pct / 100) if pct != 0 else price
+    open_reminders = sum(1 for r in reminder_rows if r["is_done"] == 0)
 
     return {
-        "price": round(price, 2),
-        "prev": round(prev, 2),
-        "pct": round(pct, 2)
+        "active_days": active_days,
+        "energy_text": energy_text,
+        "top_activity": top_activity,
+        "good_days": good_days,
+        "mid_days": mid_days,
+        "hard_days": hard_days,
+        "winnie_stable": winnie_stable,
+        "open_reminders": open_reminders
     }
 
 
-def fetch_stooq_brent():
-    html = http_get_text("https://stooq.com/q/?s=cb.f", timeout=20)
+def build_life_summary(last_routine, last_winnie, vaccine_info, weekly_stats):
+    parts = []
 
-    match = extract_first_match(html, [
-        r"Last\s*([0-9]+\.[0-9]+)\s*\$/bbl[\s\S]{0,250}?1 Day:\s*([0-9]+\.[0-9]+)([+\-]\d+\.\d+)%",
-        r"CB\.F\s*\(([+\-]?\d+\.\d+)%\)[\s\S]{0,800}?Last\s*([0-9]+\.[0-9]+)"
-    ])
+    if last_routine:
+        parts.append(f"Routine tarafında son görünüm {last_routine['flow'].lower()}.")
 
-    if not match:
-        raise ValueError("Brent değeri çözümlenemedi")
+    if last_winnie:
+        if last_winnie["appetite"] == "İyi" and last_winnie["toilet"] == "Normal":
+            parts.append("Winnie genel olarak stabil görünüyor.")
+        else:
+            parts.append("Winnie tarafında takip gerektiren küçük işaretler olabilir.")
 
-    if len(match.groups()) == 3:
-        last = float(match.group(1))
-        prev = float(match.group(2))
-        pct = float(match.group(3))
+    if weekly_stats["active_days"] >= 4:
+        parts.append("Bu hafta hareket ritmin iyi gidiyor.")
+    elif weekly_stats["active_days"] >= 2:
+        parts.append("Bu hafta orta tempoda gidiyorsun.")
     else:
-        pct = float(match.group(1))
-        last = float(match.group(2))
-        prev = last / (1 + pct / 100) if pct != 0 else last
+        parts.append("Bu hafta biraz daha düzenli kayıt girmek iyi olabilir.")
 
-    return {
-        "price": round(last, 2),
-        "prev": round(prev, 2),
-        "pct": round(pct, 2)
-    }
+    if vaccine_info["level"] == "warning":
+        parts.append("Yaklaşan aşı tarihi için hazırlık yapmayı unutma.")
 
+    if weekly_stats["open_reminders"] > 0:
+        parts.append(f"Açıkta {weekly_stats['open_reminders']} hatırlatma var.")
 
-def get_last_finance_snapshot():
-    conn = get_conn()
-    row = conn.execute("""
-        SELECT * FROM finance_snapshots
-        ORDER BY id DESC
-        LIMIT 1
-    """).fetchone()
-    conn.close()
-
-    if not row:
-        return None
-
-    return {
-        "fetched_at": row["fetched_at"],
-        "payload": json.loads(row["payload_json"])
-    }
+    return " ".join(parts)
 
 
-def save_finance_snapshot(payload):
-    conn = get_conn()
-    conn.execute("""
-        INSERT INTO finance_snapshots (fetched_at, payload_json)
-        VALUES (?, ?)
-    """, (
-        datetime.now().isoformat(timespec="seconds"),
-        json.dumps(payload, ensure_ascii=False)
-    ))
-    conn.commit()
-    conn.close()
+def classify_reminder(remind_date, is_done):
+    if is_done:
+        return "done"
 
+    if not remind_date:
+        return "normal"
 
-def is_snapshot_fresh(last_snapshot, minutes=FX_CACHE_MINUTES):
-    if not last_snapshot:
-        return False
+    d = safe_parse_date(remind_date)
+    if not d:
+        return "normal"
 
-    try:
-        last_time = datetime.fromisoformat(last_snapshot["fetched_at"])
-    except ValueError:
-        return False
+    today = date.today()
+    delta = (d - today).days
 
-    diff = datetime.now() - last_time
-    return diff.total_seconds() < (minutes * 60)
-
-
-def calc_change(value, prev):
-    if prev in (None, 0):
-        return {
-            "arrow": "•",
-            "change_text": "İlk veri",
-            "change_class": "flat"
-        }
-
-    diff = value - prev
-    pct = (diff / prev) * 100
-
-    if diff > 0:
-        return {
-            "arrow": "▲",
-            "change_text": f"+{pct:.2f}%",
-            "change_class": "up"
-        }
-    if diff < 0:
-        return {
-            "arrow": "▼",
-            "change_text": f"{pct:.2f}%",
-            "change_class": "down"
-        }
-
-    return {
-        "arrow": "•",
-        "change_text": "0.00%",
-        "change_class": "flat"
-    }
-
-
-def build_finance_cards(current_values, previous_values=None):
-    labels = {
-        "usd": "Dolar",
-        "eur": "Euro",
-        "gbp": "Sterlin",
-        "gram": "Gram Altın",
-        "ceyrek": "Çeyrek Altın",
-        "tam": "Tam Altın",
-        "brent": "Brent Petrol",
-        "faiz": "Akbank Faiz"
-    }
-
-    cards = []
-    for key in ["usd", "eur", "gbp", "gram", "ceyrek", "tam", "brent", "faiz"]:
-        value = current_values.get(key)
-        prev = previous_values.get(key) if previous_values else None
-        change = calc_change(value, prev)
-
-        cards.append({
-            "key": key,
-            "label": labels[key],
-            "value": value,
-            "display_value": f"%{value:.2f}" if key == "faiz" else f"{value:.2f}",
-            "arrow": change["arrow"],
-            "change_text": change["change_text"],
-            "change_class": change["change_class"]
-        })
-
-    return cards
-
-
-def fetch_live_finance():
-    alpha_key = os.environ.get("ALPHA_VANTAGE_API_KEY", "").strip()
-    if not alpha_key:
-        return None, "ALPHA_VANTAGE_API_KEY eksik"
-
-    try:
-        usd_try, fx_time = fetch_alpha_fx_single("USD", "TRY", alpha_key)
-
-        # EURTRY ve GBPTRY'yi USD bazlı kurdan türet
-        eur_usd, _ = fetch_alpha_fx_single("EUR", "USD", alpha_key)
-        gbp_usd, _ = fetch_alpha_fx_single("GBP", "USD", alpha_key)
-
-        eur_try = eur_usd * usd_try
-        gbp_try = gbp_usd * usd_try
-
-        xau = fetch_stooq_xauusd()
-        brent = fetch_stooq_brent()
-
-        gram_try = (xau["price"] / 31.1034768) * usd_try
-        ceyrek_try = gram_try * 1.64
-        tam_try = ceyrek_try * 4
-
-        values = {
-            "usd": round(usd_try, 2),
-            "eur": round(eur_try, 2),
-            "gbp": round(gbp_try, 2),
-            "gram": round(gram_try, 2),
-            "ceyrek": round(ceyrek_try, 2),
-            "tam": round(tam_try, 2),
-            "brent": round(brent["price"], 2),
-            "faiz": 42.00
-        }
-
-        updated_at = fx_time or datetime.now().isoformat(timespec="seconds")
-
-        return {
-            "values": values,
-            "updated_at": updated_at
-        }, None
-
-    except Exception as e:
-        print("FINANCE ERROR:", e)
-        return None, str(e)
-
-
-def resolve_finance():
-    last_snapshot = get_last_finance_snapshot()
-
-    # cache varsa ve tazeyse direkt onu kullan
-    if is_snapshot_fresh(last_snapshot):
-        payload = last_snapshot["payload"]
-        prev_values = None
-        finance_cards = build_finance_cards(payload["values"], prev_values)
-        return finance_cards, f"{last_snapshot['fetched_at']} (cache)", None
-
-    # değilse canlı veri çekmeyi dene
-    live_finance, finance_error = fetch_live_finance()
-
-    if live_finance:
-        prev_values = last_snapshot["payload"]["values"] if last_snapshot else None
-        finance_cards = build_finance_cards(live_finance["values"], prev_values)
-        save_finance_snapshot(live_finance)
-        return finance_cards, live_finance["updated_at"], None
-
-    # canlı veri başarısızsa, son başarılı snapshot varsa onu göster
-    if last_snapshot:
-        payload = last_snapshot["payload"]
-        finance_cards = build_finance_cards(payload["values"], None)
-        return finance_cards, f"{last_snapshot['fetched_at']} (son başarılı veri)", finance_error
-
-    return [], None, finance_error
+    if delta < 0:
+        return "overdue"
+    if delta <= 2:
+        return "soon"
+    return "normal"
 
 
 # -----------------------------
@@ -629,6 +464,11 @@ def index():
         ORDER BY vaccine_date ASC, id DESC
     """).fetchall()
 
+    reminder_rows = cur.execute("""
+        SELECT * FROM reminders
+        ORDER BY is_done ASC, remind_date IS NULL, remind_date ASC, id DESC
+    """).fetchall()
+
     conn.close()
 
     last_routine = routine_rows[0] if routine_rows else None
@@ -641,8 +481,20 @@ def index():
     vaccine_info = vaccine_status(vaccine_rows)
     streak = calculate_streak(routine_rows)
     score, score_text = calculate_daily_score(routine_rows, winnie_rows, vaccine_info)
+    weekly_stats = build_weekly_stats(routine_rows, winnie_rows, reminder_rows)
+    life_summary = build_life_summary(last_routine, last_winnie, vaccine_info, weekly_stats)
 
-    finance_cards, finance_updated_at, finance_error = resolve_finance()
+    decorated_reminders = []
+    for r in reminder_rows:
+        decorated_reminders.append({
+            "id": r["id"],
+            "title": r["title"],
+            "note": r["note"],
+            "remind_date": r["remind_date"],
+            "priority": r["priority"],
+            "is_done": r["is_done"],
+            "state_class": classify_reminder(r["remind_date"], r["is_done"])
+        })
 
     return render_template(
         "dashboard.html",
@@ -651,20 +503,20 @@ def index():
         routine_rows=routine_rows,
         winnie_rows=winnie_rows,
         vaccine_rows=vaccine_rows,
-        finance_cards=finance_cards,
-        finance_updated_at=finance_updated_at,
-        finance_error=finance_error,
+        reminders=decorated_reminders,
         streak=streak,
         score=score,
         score_text=score_text,
         routine_comment=build_routine_comment(routine_rows),
         winnie_comment=build_winnie_comment(winnie_rows),
-        vaccine_info=vaccine_status(vaccine_rows),
+        vaccine_info=vaccine_info,
         routine_trend=routine_trend(last_routine),
         winnie_trend=winnie_trend(last_winnie),
         chart_labels=json.dumps(chart_labels, ensure_ascii=False),
         chart_values=json.dumps(chart_values),
-        today_value=today_str()
+        today_value=today_str(),
+        weekly_stats=weekly_stats,
+        life_summary=life_summary
     )
 
 
@@ -742,6 +594,54 @@ def add_vaccine():
         conn.commit()
         conn.close()
 
+    return redirect("/")
+
+
+@app.route("/add_reminder", methods=["POST"])
+def add_reminder():
+    title = request.form.get("title", "").strip()
+    note = request.form.get("note", "").strip()
+    remind_date = request.form.get("remind_date", "").strip()
+    priority = request.form.get("priority", "Normal").strip()
+
+    if title:
+        conn = get_conn()
+        conn.execute("""
+            INSERT INTO reminders (title, note, remind_date, priority, is_done, created_at)
+            VALUES (?, ?, ?, ?, 0, ?)
+        """, (
+            title,
+            note,
+            remind_date if remind_date else None,
+            priority,
+            datetime.now().isoformat(timespec="seconds")
+        ))
+        conn.commit()
+        conn.close()
+
+    return redirect("/")
+
+
+@app.route("/toggle_reminder/<int:reminder_id>", methods=["POST"])
+def toggle_reminder(reminder_id):
+    conn = get_conn()
+    row = conn.execute("SELECT is_done FROM reminders WHERE id = ?", (reminder_id,)).fetchone()
+
+    if row:
+        new_val = 0 if row["is_done"] == 1 else 1
+        conn.execute("UPDATE reminders SET is_done = ? WHERE id = ?", (new_val, reminder_id))
+        conn.commit()
+
+    conn.close()
+    return redirect("/")
+
+
+@app.route("/delete_reminder/<int:reminder_id>", methods=["POST"])
+def delete_reminder(reminder_id):
+    conn = get_conn()
+    conn.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
+    conn.commit()
+    conn.close()
     return redirect("/")
 
 
