@@ -237,7 +237,8 @@ body {
 .form-card,
 .chart-card,
 .highlight-card,
-.history-card {
+.history-card,
+.weekly-card {
     background: var(--panel);
     border-radius: 28px;
     padding: 24px;
@@ -257,7 +258,8 @@ body {
 .form-card h3,
 .chart-card h3,
 .highlight-card h3,
-.history-card h3 {
+.history-card h3,
+.weekly-card h3 {
     margin-top: 0;
     margin-bottom: 14px;
     font-size: 20px;
@@ -370,6 +372,35 @@ body {
 
 .highlight-text strong {
     font-size: 20px;
+    color: var(--accent);
+}
+
+.weekly-card {
+    margin-bottom: 24px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-top: 12px;
+}
+
+.stat-box {
+    background: var(--panel-soft);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 18px;
+}
+
+.stat-box span {
+    color: var(--muted);
+    display: block;
+    margin-bottom: 8px;
+}
+
+.stat-box strong {
+    font-size: 28px;
     color: var(--accent);
 }
 
@@ -577,91 +608,113 @@ button {
     line-height: 1.5;
 }
 
-.finance-head {
-    align-items: flex-start;
+.reminders-section {
+    margin-bottom: 24px;
 }
 
-.finance-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
+.reminders-layout {
+    align-items: start;
 }
 
-.mini-finance-card {
+.reminder-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.reminder-item {
     background: var(--panel-soft);
     border: 1px solid var(--border);
     border-radius: 18px;
-    padding: 18px;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.reminder-item.soon {
+    border-color: rgba(251, 191, 36, 0.35);
+}
+
+.reminder-item.overdue {
+    border-color: rgba(248, 113, 113, 0.40);
+}
+
+.reminder-item.completed {
+    opacity: 0.72;
+}
+
+.reminder-main {
+    flex: 1;
+}
+
+.reminder-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.reminder-title-row h4 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.priority-badge {
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.priority-badge.düşük {
+    background: var(--flat-soft);
+    color: var(--flat);
+}
+
+.priority-badge.normal {
+    background: var(--mid-soft);
+    color: var(--mid);
+}
+
+.priority-badge.yüksek {
+    background: var(--bad-soft);
+    color: var(--bad);
+}
+
+.reminder-date,
+.reminder-note {
+    margin: 6px 0 0;
+    color: var(--muted);
+}
+
+.reminder-actions {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-width: 110px;
 }
 
-.mini-finance-card span {
-    color: var(--muted);
-    font-size: 14px;
+.small-btn {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
 }
 
-.mini-finance-card strong {
-    font-size: 28px;
-    color: var(--text);
-}
-
-.mini-finance-card.accent strong {
-    color: var(--accent);
-}
-
-.finance-change {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    font-weight: 700;
-    margin-top: 4px;
-}
-
-.finance-change.up {
-    color: var(--good);
-}
-
-.finance-change.down {
-    color: var(--bad);
-}
-
-.finance-change.flat {
-    color: var(--flat);
-}
-
-.mini-inline-change {
-    font-size: 12px;
-    font-weight: 700;
-    margin-left: 6px;
-}
-
-.mini-inline-change.up {
-    color: var(--good);
-}
-
-.mini-inline-change.down {
-    color: var(--bad);
-}
-
-.mini-inline-change.flat {
-    color: var(--flat);
-}
-
-.finance-error {
-    color: var(--bad);
+.danger-btn {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
 }
 
 @media (max-width: 1000px) {
     .cards,
     .info-grid,
     .two-col,
-    .finance-grid,
     .choice-grid.three,
     .choice-grid.two,
-    .mini-history-grid {
+    .mini-history-grid,
+    .stats-grid {
         grid-template-columns: 1fr;
     }
 
@@ -684,8 +737,14 @@ button {
     }
 
     .card-head,
-    .section-head {
+    .section-head,
+    .reminder-item {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .reminder-actions {
+        width: 100%;
+        min-width: unset;
     }
 }
