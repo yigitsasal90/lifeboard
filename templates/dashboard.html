@@ -4,9 +4,14 @@
 <section class="hero">
     <div class="hero-topline">
         <p class="mini-title">Hoş geldin</p>
-        {% if vaccine_info.badge %}
-            <span class="alert-badge {{ vaccine_info.level }}">{{ vaccine_info.badge }}</span>
-        {% endif %}
+        <div class="hero-badges">
+            {% if vaccine_info.badge %}
+                <span class="alert-badge {{ vaccine_info.level }}">{{ vaccine_info.badge }}</span>
+            {% endif %}
+            {% if overdue_count > 0 %}
+                <span class="alert-badge danger">{{ overdue_count }} geciken</span>
+            {% endif %}
+        </div>
     </div>
 
     <h2>Bugünün Özeti</h2>
@@ -311,33 +316,66 @@
 
 <section class="reminders-section">
     <div class="section-head">
-        <h3>Hatırlatmalar</h3>
-        <span class="section-sub">Apple Anımsatıcılar gibi kişisel yapılacaklar alanı</span>
+        <div>
+            <h3>Hatırlatmalar</h3>
+            <span class="section-sub">Apple Anımsatıcılar gibi kişisel yapılacaklar alanı</span>
+        </div>
+
+        <div class="filter-pills reminders-pills">
+            <a href="/?reminder_filter=all" class="filter-pill-link {% if active_reminder_filter == 'all' %}active{% endif %}">Tümü</a>
+            <a href="/?reminder_filter=today" class="filter-pill-link {% if active_reminder_filter == 'today' %}active{% endif %}">Bugün</a>
+            <a href="/?reminder_filter=week" class="filter-pill-link {% if active_reminder_filter == 'week' %}active{% endif %}">Bu hafta</a>
+            <a href="/?reminder_filter=done" class="filter-pill-link {% if active_reminder_filter == 'done' %}active{% endif %}">Tamamlananlar</a>
+        </div>
     </div>
 
     <div class="two-col reminders-layout">
         <div class="form-card">
-            <h3>Yeni Hatırlatma</h3>
+            {% if edit_reminder %}
+                <h3>Hatırlatmayı Düzenle</h3>
+                <form method="POST" action="/update_reminder/{{ edit_reminder.id }}">
+                    <label>Başlık</label>
+                    <input type="text" name="title" value="{{ edit_reminder.title }}" required>
 
-            <form method="POST" action="/add_reminder">
-                <label>Başlık</label>
-                <input type="text" name="title" placeholder="Örn: Winnie aşı kontrolü" required>
+                    <label>Tarih</label>
+                    <input type="date" name="remind_date" value="{{ edit_reminder.remind_date or '' }}">
 
-                <label>Tarih</label>
-                <input type="date" name="remind_date">
+                    <label>Öncelik</label>
+                    <select name="priority" required>
+                        <option value="Düşük" {% if edit_reminder.priority == 'Düşük' %}selected{% endif %}>Düşük</option>
+                        <option value="Normal" {% if edit_reminder.priority == 'Normal' %}selected{% endif %}>Normal</option>
+                        <option value="Yüksek" {% if edit_reminder.priority == 'Yüksek' %}selected{% endif %}>Yüksek</option>
+                    </select>
 
-                <label>Öncelik</label>
-                <select name="priority" required>
-                    <option value="Düşük">Düşük</option>
-                    <option value="Normal" selected>Normal</option>
-                    <option value="Yüksek">Yüksek</option>
-                </select>
+                    <label>Not</label>
+                    <textarea name="note" placeholder="Detay yazabilirsin">{{ edit_reminder.note or '' }}</textarea>
 
-                <label>Not</label>
-                <textarea name="note" placeholder="Detay yazabilirsin"></textarea>
+                    <button type="submit">Güncelle</button>
+                    <a href="/" class="cancel-link">Vazgeç</a>
+                </form>
+            {% else %}
+                <h3>Yeni Hatırlatma</h3>
 
-                <button type="submit">Hatırlatma Ekle</button>
-            </form>
+                <form method="POST" action="/add_reminder">
+                    <label>Başlık</label>
+                    <input type="text" name="title" placeholder="Örn: Winnie aşı kontrolü" required>
+
+                    <label>Tarih</label>
+                    <input type="date" name="remind_date">
+
+                    <label>Öncelik</label>
+                    <select name="priority" required>
+                        <option value="Düşük">Düşük</option>
+                        <option value="Normal" selected>Normal</option>
+                        <option value="Yüksek">Yüksek</option>
+                    </select>
+
+                    <label>Not</label>
+                    <textarea name="note" placeholder="Detay yazabilirsin"></textarea>
+
+                    <button type="submit">Hatırlatma Ekle</button>
+                </form>
+            {% endif %}
         </div>
 
         <div class="form-card">
@@ -363,6 +401,11 @@
                             </div>
 
                             <div class="reminder-actions">
+                                <form method="GET" action="/">
+                                    <input type="hidden" name="edit_reminder" value="{{ item.id }}">
+                                    <button type="submit" class="small-btn secondary-btn">Düzenle</button>
+                                </form>
+
                                 <form method="POST" action="/toggle_reminder/{{ item.id }}">
                                     <button type="submit" class="small-btn">
                                         {% if item.is_done %}Geri Al{% else %}Tamamla{% endif %}
@@ -376,7 +419,7 @@
                         </div>
                     {% endfor %}
                 {% else %}
-                    <p>Henüz hatırlatma yok.</p>
+                    <p>Bu filtrede hatırlatma yok.</p>
                 {% endif %}
             </div>
         </div>
