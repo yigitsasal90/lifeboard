@@ -114,8 +114,16 @@ body {
 .hero-topline {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
     margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.hero-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .hero .mini-title {
@@ -559,7 +567,8 @@ button {
     flex-wrap: wrap;
 }
 
-.filter-pill {
+.filter-pill,
+.filter-pill-link {
     border: 1px solid var(--border);
     background: var(--panel-soft);
     color: var(--text);
@@ -568,9 +577,11 @@ button {
     font-size: 13px;
     font-weight: 700;
     cursor: pointer;
+    text-decoration: none;
 }
 
-.filter-pill.active {
+.filter-pill.active,
+.filter-pill-link.active {
     background: var(--accent-soft);
     color: var(--accent);
     border-color: var(--accent);
@@ -638,6 +649,7 @@ button {
 
 .reminder-item.overdue {
     border-color: rgba(248, 113, 113, 0.40);
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.10) inset;
 }
 
 .reminder-item.completed {
@@ -702,9 +714,25 @@ button {
     border-radius: 12px;
 }
 
+.secondary-btn {
+    background: linear-gradient(135deg, #334155, #475569);
+    color: white;
+}
+
 .danger-btn {
     background: linear-gradient(135deg, #ef4444, #dc2626);
     color: white;
+}
+
+.cancel-link {
+    text-align: center;
+    text-decoration: none;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--panel-soft);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    font-weight: 700;
 }
 
 @media (max-width: 1000px) {
