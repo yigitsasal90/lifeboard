@@ -1,102 +1,107 @@
 from flask import Flask, render_template, request, redirect
-import sqlite3
-import os
 import json
+import os
 from datetime import datetime, date, timedelta
+
+import psycopg
+from psycopg.rows import dict_row
 
 app = Flask(__name__)
 
-DB_PATH = "lifeboard.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
 
-# -----------------------------
-# DB
-# -----------------------------
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL eksik.")
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 
 def column_exists(conn, table_name, column_name):
-    cols = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
-    return any(col["name"] == column_name for col in cols)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = %s
+            """,
+            (table_name,)
+        )
+        cols = [r["column_name"] for r in cur.fetchall()]
+    return column_name in cols
 
 
 def init_db():
-    conn = get_conn()
-    cur = conn.cursor()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS routine_logs (
+                    id SERIAL PRIMARY KEY,
+                    log_date TEXT NOT NULL,
+                    flow TEXT,
+                    mood TEXT,
+                    energy TEXT NOT NULL,
+                    pain TEXT NOT NULL,
+                    activity TEXT NOT NULL,
+                    note TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """)
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS routine_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            log_date TEXT NOT NULL,
-            flow TEXT,
-            mood TEXT,
-            energy TEXT NOT NULL,
-            pain TEXT NOT NULL,
-            activity TEXT NOT NULL,
-            note TEXT,
-            created_at TEXT NOT NULL
-        )
-    """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS winnie_logs (
+                    id SERIAL PRIMARY KEY,
+                    log_date TEXT NOT NULL,
+                    appetite TEXT NOT NULL,
+                    energy TEXT NOT NULL,
+                    toilet TEXT NOT NULL,
+                    itch TEXT NOT NULL,
+                    note TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """)
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS winnie_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            log_date TEXT NOT NULL,
-            appetite TEXT NOT NULL,
-            energy TEXT NOT NULL,
-            toilet TEXT NOT NULL,
-            itch TEXT NOT NULL,
-            note TEXT,
-            created_at TEXT NOT NULL
-        )
-    """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS vaccine_logs (
+                    id SERIAL PRIMARY KEY,
+                    vaccine_date TEXT NOT NULL,
+                    vaccine_name TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """)
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS vaccine_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            vaccine_date TEXT NOT NULL,
-            vaccine_name TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )
-    """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS reminders (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    note TEXT,
+                    remind_date TEXT,
+                    priority TEXT NOT NULL DEFAULT 'Normal',
+                    is_done INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL
+                )
+            """)
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS reminders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            note TEXT,
-            remind_date TEXT,
-            priority TEXT NOT NULL DEFAULT 'Normal',
-            is_done INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL
-        )
-    """)
+        if not column_exists(conn, "routine_logs", "flow"):
+            with conn.cursor() as cur:
+                cur.execute("ALTER TABLE routine_logs ADD COLUMN flow TEXT")
 
-    if not column_exists(conn, "routine_logs", "flow"):
-        conn.execute("ALTER TABLE routine_logs ADD COLUMN flow TEXT")
+        if column_exists(conn, "routine_logs", "mood"):
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE routine_logs
+                    SET flow = CASE
+                        WHEN mood = 'İyiydi' THEN 'Rahattı'
+                        WHEN mood = 'Normaldi' THEN 'Dengeliydi'
+                        WHEN mood = 'Yorucuydu' THEN 'Zorladı'
+                        ELSE COALESCE(flow, 'Dengeliydi')
+                    END
+                    WHERE flow IS NULL OR flow = ''
+                """)
 
-    if column_exists(conn, "routine_logs", "mood"):
-        conn.execute("""
-            UPDATE routine_logs
-            SET flow = CASE
-                WHEN mood = 'İyiydi' THEN 'Rahattı'
-                WHEN mood = 'Normaldi' THEN 'Dengeliydi'
-                WHEN mood = 'Yorucuydu' THEN 'Zorladı'
-                ELSE COALESCE(flow, 'Dengeliydi')
-            END
-            WHERE flow IS NULL OR flow = ''
-        """)
-
-    conn.commit()
-    conn.close()
+        conn.commit()
 
 
-# -----------------------------
-# HELPERS
-# -----------------------------
 def today_str():
     return date.today().isoformat()
 
@@ -441,35 +446,81 @@ def classify_reminder(remind_date, is_done):
     return "normal"
 
 
+def reminder_filter_match(reminder, active_filter):
+    d = safe_parse_date(reminder["remind_date"]) if reminder["remind_date"] else None
+    today = date.today()
+
+    if active_filter == "today":
+        return d == today and reminder["is_done"] == 0
+
+    if active_filter == "week":
+        if reminder["is_done"] == 1 or not d:
+            return False
+        return today <= d <= (today + timedelta(days=6))
+
+    if active_filter == "done":
+        return reminder["is_done"] == 1
+
+    return True
+
+
+def decorate_reminders(reminder_rows, active_filter="all"):
+    decorated = []
+    overdue_count = 0
+
+    for r in reminder_rows:
+        state_class = classify_reminder(r["remind_date"], r["is_done"])
+        if state_class == "overdue":
+            overdue_count += 1
+
+        item = {
+            "id": r["id"],
+            "title": r["title"],
+            "note": r["note"],
+            "remind_date": r["remind_date"],
+            "priority": r["priority"],
+            "is_done": r["is_done"],
+            "state_class": state_class
+        }
+
+        if reminder_filter_match(item, active_filter):
+            decorated.append(item)
+
+    return decorated, overdue_count
+
+
 # -----------------------------
 # ROUTES
 # -----------------------------
 @app.route("/")
 def index():
-    conn = get_conn()
-    cur = conn.cursor()
+    active_reminder_filter = request.args.get("reminder_filter", "all")
 
-    routine_rows = cur.execute("""
-        SELECT * FROM routine_logs
-        ORDER BY log_date DESC, id DESC
-    """).fetchall()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM routine_logs
+                ORDER BY log_date DESC, id DESC
+            """)
+            routine_rows = cur.fetchall()
 
-    winnie_rows = cur.execute("""
-        SELECT * FROM winnie_logs
-        ORDER BY log_date DESC, id DESC
-    """).fetchall()
+            cur.execute("""
+                SELECT * FROM winnie_logs
+                ORDER BY log_date DESC, id DESC
+            """)
+            winnie_rows = cur.fetchall()
 
-    vaccine_rows = cur.execute("""
-        SELECT * FROM vaccine_logs
-        ORDER BY vaccine_date ASC, id DESC
-    """).fetchall()
+            cur.execute("""
+                SELECT * FROM vaccine_logs
+                ORDER BY vaccine_date ASC, id DESC
+            """)
+            vaccine_rows = cur.fetchall()
 
-    reminder_rows = cur.execute("""
-        SELECT * FROM reminders
-        ORDER BY is_done ASC, remind_date IS NULL, remind_date ASC, id DESC
-    """).fetchall()
-
-    conn.close()
+            cur.execute("""
+                SELECT * FROM reminders
+                ORDER BY is_done ASC, remind_date IS NULL, remind_date ASC, id DESC
+            """)
+            reminder_rows = cur.fetchall()
 
     last_routine = routine_rows[0] if routine_rows else None
     last_winnie = winnie_rows[0] if winnie_rows else None
@@ -484,17 +535,19 @@ def index():
     weekly_stats = build_weekly_stats(routine_rows, winnie_rows, reminder_rows)
     life_summary = build_life_summary(last_routine, last_winnie, vaccine_info, weekly_stats)
 
-    decorated_reminders = []
-    for r in reminder_rows:
-        decorated_reminders.append({
-            "id": r["id"],
-            "title": r["title"],
-            "note": r["note"],
-            "remind_date": r["remind_date"],
-            "priority": r["priority"],
-            "is_done": r["is_done"],
-            "state_class": classify_reminder(r["remind_date"], r["is_done"])
-        })
+    reminders, overdue_count = decorate_reminders(reminder_rows, active_reminder_filter)
+
+    edit_reminder_id = request.args.get("edit_reminder")
+    edit_reminder = None
+    if edit_reminder_id:
+        try:
+            edit_reminder_id = int(edit_reminder_id)
+            for item in reminder_rows:
+                if item["id"] == edit_reminder_id:
+                    edit_reminder = item
+                    break
+        except ValueError:
+            edit_reminder = None
 
     return render_template(
         "dashboard.html",
@@ -503,7 +556,7 @@ def index():
         routine_rows=routine_rows,
         winnie_rows=winnie_rows,
         vaccine_rows=vaccine_rows,
-        reminders=decorated_reminders,
+        reminders=reminders,
         streak=streak,
         score=score,
         score_text=score_text,
@@ -516,7 +569,10 @@ def index():
         chart_values=json.dumps(chart_values),
         today_value=today_str(),
         weekly_stats=weekly_stats,
-        life_summary=life_summary
+        life_summary=life_summary,
+        overdue_count=overdue_count,
+        active_reminder_filter=active_reminder_filter,
+        edit_reminder=edit_reminder
     )
 
 
@@ -529,21 +585,21 @@ def add_routine():
     activity = request.form.get("activity")
     note = request.form.get("note", "").strip()
 
-    conn = get_conn()
-    conn.execute("""
-        INSERT INTO routine_logs (log_date, flow, energy, pain, activity, note, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (
-        log_date,
-        flow,
-        energy,
-        pain,
-        activity,
-        note,
-        datetime.now().isoformat(timespec="seconds")
-    ))
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO routine_logs (log_date, flow, energy, pain, activity, note, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                log_date,
+                flow,
+                energy,
+                pain,
+                activity,
+                note,
+                datetime.now().isoformat(timespec="seconds")
+            ))
+        conn.commit()
 
     return redirect("/")
 
@@ -557,21 +613,21 @@ def add_winnie():
     itch = request.form.get("itch")
     note = request.form.get("note", "").strip()
 
-    conn = get_conn()
-    conn.execute("""
-        INSERT INTO winnie_logs (log_date, appetite, energy, toilet, itch, note, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (
-        log_date,
-        appetite,
-        energy,
-        toilet,
-        itch,
-        note,
-        datetime.now().isoformat(timespec="seconds")
-    ))
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO winnie_logs (log_date, appetite, energy, toilet, itch, note, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                log_date,
+                appetite,
+                energy,
+                toilet,
+                itch,
+                note,
+                datetime.now().isoformat(timespec="seconds")
+            ))
+        conn.commit()
 
     return redirect("/")
 
@@ -582,17 +638,17 @@ def add_vaccine():
     vaccine_name = request.form.get("name", "").strip()
 
     if vaccine_date and vaccine_name:
-        conn = get_conn()
-        conn.execute("""
-            INSERT INTO vaccine_logs (vaccine_date, vaccine_name, created_at)
-            VALUES (?, ?, ?)
-        """, (
-            vaccine_date,
-            vaccine_name,
-            datetime.now().isoformat(timespec="seconds")
-        ))
-        conn.commit()
-        conn.close()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO vaccine_logs (vaccine_date, vaccine_name, created_at)
+                    VALUES (%s, %s, %s)
+                """, (
+                    vaccine_date,
+                    vaccine_name,
+                    datetime.now().isoformat(timespec="seconds")
+                ))
+            conn.commit()
 
     return redirect("/")
 
@@ -605,43 +661,76 @@ def add_reminder():
     priority = request.form.get("priority", "Normal").strip()
 
     if title:
-        conn = get_conn()
-        conn.execute("""
-            INSERT INTO reminders (title, note, remind_date, priority, is_done, created_at)
-            VALUES (?, ?, ?, ?, 0, ?)
-        """, (
-            title,
-            note,
-            remind_date if remind_date else None,
-            priority,
-            datetime.now().isoformat(timespec="seconds")
-        ))
-        conn.commit()
-        conn.close()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO reminders (title, note, remind_date, priority, is_done, created_at)
+                    VALUES (%s, %s, %s, %s, 0, %s)
+                """, (
+                    title,
+                    note,
+                    remind_date if remind_date else None,
+                    priority,
+                    datetime.now().isoformat(timespec="seconds")
+                ))
+            conn.commit()
+
+    return redirect("/")
+
+
+@app.route("/update_reminder/<int:reminder_id>", methods=["POST"])
+def update_reminder(reminder_id):
+    title = request.form.get("title", "").strip()
+    note = request.form.get("note", "").strip()
+    remind_date = request.form.get("remind_date", "").strip()
+    priority = request.form.get("priority", "Normal").strip()
+
+    if title:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE reminders
+                    SET title = %s,
+                        note = %s,
+                        remind_date = %s,
+                        priority = %s
+                    WHERE id = %s
+                """, (
+                    title,
+                    note,
+                    remind_date if remind_date else None,
+                    priority,
+                    reminder_id
+                ))
+            conn.commit()
 
     return redirect("/")
 
 
 @app.route("/toggle_reminder/<int:reminder_id>", methods=["POST"])
 def toggle_reminder(reminder_id):
-    conn = get_conn()
-    row = conn.execute("SELECT is_done FROM reminders WHERE id = ?", (reminder_id,)).fetchone()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT is_done FROM reminders WHERE id = %s", (reminder_id,))
+            row = cur.fetchone()
 
-    if row:
-        new_val = 0 if row["is_done"] == 1 else 1
-        conn.execute("UPDATE reminders SET is_done = ? WHERE id = ?", (new_val, reminder_id))
+            if row:
+                new_val = 0 if row["is_done"] == 1 else 1
+                cur.execute(
+                    "UPDATE reminders SET is_done = %s WHERE id = %s",
+                    (new_val, reminder_id)
+                )
         conn.commit()
 
-    conn.close()
     return redirect("/")
 
 
 @app.route("/delete_reminder/<int:reminder_id>", methods=["POST"])
 def delete_reminder(reminder_id):
-    conn = get_conn()
-    conn.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
-    conn.commit()
-    conn.close()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM reminders WHERE id = %s", (reminder_id,))
+        conn.commit()
     return redirect("/")
 
 
